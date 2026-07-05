@@ -24,7 +24,10 @@ class CamerasNode(Node):
 
         self.cameras = []
         for uid, label in zip(camera_uids, camera_labels):
-            capture = cv2.VideoCapture(uid)
+            if isinstance(uid, str):
+                capture = cv2.VideoCapture(uid, cv2.CAP_GSTREAMER)
+            else:
+                capture = cv2.VideoCapture(uid)
 
             # Ask USB camera/OpenCV for MJPEG capture if supported.
             capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -63,7 +66,7 @@ class CamerasNode(Node):
         timer_period = 1.0 / fps
         self.timer = self.create_timer(timer_period, self.publish_frames)
 
-        self.get_logger().info("Cameras node started.")
+        self.get_logger().info("Cameras node started. 1")
 
     def publish_frames(self):
         timestamp = self.get_clock().now().to_msg()

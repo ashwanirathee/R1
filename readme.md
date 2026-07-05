@@ -80,7 +80,20 @@ docker run -it --rm \
   -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
   r1_ros_1:latest
 
-cd ~/r1
+
+docker run -it --rm \
+  --name r1_ros_1 \
+  --add-host=host.docker.internal:host-gateway \
+  --group-add video \
+  --device /dev/video10 \
+  -p 8765:8765 \
+  -p 8002:8002 \
+  -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
+  r1_ros_1:latest
+
+The web dashboard is available on the host at `http://<host-ip>:8002/` once the container is running.
+
+cd /home/ubuntu/r1
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch r1 bringup.launch.py \
@@ -90,6 +103,7 @@ ros2 launch r1 bringup.launch.py \
   camera_labels:='["main"]' \
   yolo_camera_uid:=10 \
   enable_slam:=false \
+  enable_web:=true \
   enable_ear:=false \
   enable_audio:=false \
   enable_vlm:=false \
