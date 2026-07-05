@@ -61,7 +61,24 @@ docker run -it --rm \
   -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
   r1_ros:current
 
-docker commit r1_ros r1_ros:current
+docker run -it --rm \
+  --name r1_ros \
+  --add-host=host.docker.internal:host-gateway \
+  --group-add video \
+  --device /dev/video10 \
+  -p 8765:8765 \
+  -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
+  r1_ros:current
+
+
+docker run -it --rm \
+  --name r1_ros_1 \
+  --add-host=host.docker.internal:host-gateway \
+  --group-add video \
+  --device /dev/video10 \
+  -p 8765:8765 \
+  -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
+  r1_ros_1:latest
 
 cd ~/r1
 source /opt/ros/jazzy/setup.bash
@@ -69,14 +86,14 @@ source install/setup.bash
 ros2 launch r1 bringup.launch.py \
   event_min_interval_sec:=5.0 \
   event_max_silence_sec:=5.0 \
-  camera_uids:="[8]" \
-  camera_labels:='["left", "right"]' \
-  yolo_camera_uid:=8 \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  yolo_camera_uid:=10 \
   enable_slam:=false \
   enable_ear:=false \
   enable_audio:=false \
   enable_vlm:=false \
-  enable_2dobd:=true \
+  enable_2dobd:=false \
   enable_3dobd:=false
   
 
@@ -85,7 +102,7 @@ apt update
 apt install -y ros-jazzy-foxglove-bridge
 exit
 
-docker exec -it murphy_ros bash
+docker exec -it r1_ros_1 bash
 
 ros2 topic hz /camera/uid_0/image_raw
 ros2 topic hz /camera/uid_2/image_raw
@@ -102,6 +119,7 @@ cd ~/murphy_p2
 source install/setup.bash
 python3 -m pip install --upgrade pip
 python3 -m pip install ultralytics opencv-python-headless
+python3 -m pip install fastapi
 
 
 docker exec -u 0 -it murphy_ros bash
@@ -184,6 +202,14 @@ ros2 topic pub --once /audio/heard_text std_msgs/msg/String "{data: 'how many ca
 
 # run the speaker bridge in the host machine to forward audio from ROS to the bluetooth speaker
 /home/murphy/Documents/murphy_p2/src/speaker_bridge.sh
+```
+
+Dockerfile
+```
+docker build -t r1-ros-1 .
+docker rmi r1_ros_1
+docker commit r1_ros r1_ros:current
+
 ```
 
 ##### Ear Node:
