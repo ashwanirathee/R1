@@ -18,6 +18,7 @@ def generate_launch_description():
     enable_ear = LaunchConfiguration("enable_ear")
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
+    enable_web = LaunchConfiguration("enable_web")
     event_min_interval_sec = LaunchConfiguration("event_min_interval_sec")
     event_max_silence_sec = LaunchConfiguration("event_max_silence_sec")
     slam_camera_topic = LaunchConfiguration("slam_camera_topic")
@@ -100,6 +101,11 @@ def generate_launch_description():
                 "enable_slam",
                 default_value="false",
                 description="Start the experimental monocular SLAM node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_web",
+                default_value="true",
+                description="Start the web dashboard node.",
             ),
             DeclareLaunchArgument(
                 "slam_camera_topic",
@@ -211,6 +217,13 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(enable_vlm),
+            ),
+            Node(
+                package="r1_web",
+                executable="web_ui_node",
+                name="web_ui_node",
+                output="screen",
+                condition=IfCondition(enable_web),
             ),
         ]
     )

@@ -61,18 +61,39 @@ docker run -it --rm \
   -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
   r1_ros:current
 
-docker commit r1_ros r1_ros:current
+docker run -it --rm \
+  --name r1_ros \
+  --add-host=host.docker.internal:host-gateway \
+  --group-add video \
+  --device /dev/video10 \
+  -p 8765:8765 \
+  -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
+  r1_ros:current
 
-cd ~/r1
+
+docker run -it --rm \
+  --name r1_ros_1 \
+  --add-host=host.docker.internal:host-gateway \
+  --group-add video \
+  --device /dev/video10 \
+  -p 8765:8765 \
+  -p 8002:8002 \
+  -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
+  r1_ros_1:latest
+
+The web dashboard is available on the host at `http://<host-ip>:8002/` once the container is running.
+
+cd /home/ubuntu/r1
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch r1 bringup.launch.py \
   event_min_interval_sec:=5.0 \
   event_max_silence_sec:=5.0 \
-  camera_uids:="[8]" \
+  camera_uids:="[10]" \
   camera_labels:='["left", "right"]' \
-  yolo_camera_uid:=8 \
+  yolo_camera_uid:=10 \
   enable_slam:=false \
+  enable_web:=true \
   enable_ear:=false \
   enable_audio:=false \
   enable_vlm:=false \
@@ -184,6 +205,14 @@ ros2 topic pub --once /audio/heard_text std_msgs/msg/String "{data: 'how many ca
 
 # run the speaker bridge in the host machine to forward audio from ROS to the bluetooth speaker
 /home/murphy/Documents/murphy_p2/src/speaker_bridge.sh
+```
+
+Dockerfile
+```
+docker build -t r1_ros_1 .
+docker rmi r1_ros_1
+docker commit r1_ros r1_ros:current
+
 ```
 
 ##### Ear Node:

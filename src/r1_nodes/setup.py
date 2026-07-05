@@ -23,15 +23,13 @@ setup(
             'pytest',
         ],
     },
-    entry_points={
-        "console_scripts": [
-            "cameras_node = r1.cameras_node:main",
-            "visual_processor_node = r1.visual_processor_node:main",
-            "brain_node = r1.brain_node:main",
-            "audio_node = r1.audio_node:main",
-            "ear_node = r1.ear_node:main",
-            "action_node = r1.action_node:main",
-            "vlm_node = r1.vlm_node:main",
-        ],
-    },
+    scripts=[
+        'r1/launchers/cameras_node',
+        'r1/launchers/visual_processor_node',
+        'r1/launchers/brain_node',
+        'r1/launchers/audio_node',
+        'r1/launchers/ear_node',
+        'r1/launchers/action_node',
+        'r1/launchers/vlm_node',
+    ],
 )
