@@ -1,10 +1,11 @@
 FROM ros:jazzy-perception
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/Los_Angeles
 ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 
-# System + ROS dependencies
-RUN apt update && apt install -y \
+# Timezone + system + ROS dependencies
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    tzdata \
     python3-pip \
     python3-opencv \
     python3-requests \
@@ -14,7 +15,15 @@ RUN apt update && apt install -y \
     alsa-utils \
     sox \
     ros-jazzy-foxglove-bridge \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# PyTorch CPU wheels
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+    torch torchvision \
+    --index-url https://download.pytorch.org/whl/cpu
 
 # Normal Python packages WITH dependencies
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
@@ -35,11 +44,6 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # Ultralytics without dependencies, to avoid it changing your torch/opencv stack
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
     ultralytics --no-deps
-
-# PyTorch CPU wheels
-RUN python3 -m pip install --break-system-packages --no-cache-dir \
-    torch torchvision \
-    --index-url https://download.pytorch.org/whl/cpu
 
 WORKDIR /home/ubuntu/r1
 
