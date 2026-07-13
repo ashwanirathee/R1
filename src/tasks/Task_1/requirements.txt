@@ -1,0 +1,12 @@
+open_clip_torch
+numpy
+pandas
+label-studio
+matplotlib
+scipy
+fiftyone
+pandas
+mcap
+mcap-ros2-support
+rosbags
+opencv-python

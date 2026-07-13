@@ -34,3 +34,8 @@ vision_images/
 experimental/
 data/
 .env
+
+*.tar.gz
+
+.venv_exp1/
+.venv_r1/
