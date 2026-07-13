@@ -40,12 +40,13 @@ We use the balanced F1 score (2 * precision * recall / (precision + recall)) to 
 
 | Method      | Details  | F1 score | Inference Time (FPS) |
 |-------------|------------|----------| ---------------|
-| Open Clip   | yes_score > no_score or yes_prob > no_prob, zero shot classification | 0.92 | 13.57 ms |
-| Open Clip   | Validation data based threshold | - |
+| Open Clip   | yes_score > no_score or yes_prob > no_prob, zero shot classification | 0.920 | 13.57 ms |
+| Open Clip   | Validation data based threshold | 0.938 | 14 ms |
 
 ### Future Work:
 Add for comparison and evaluation of different methods for image classification:
-1. Zero-shot CLIP baseline
+1. Zero-shot OpenCLIP baseline
+2. OpenClip validation data based threshold
 2. Frozen CLIP/ViT/DINO embeddings + logistic regression
 3. Pretrained ViT + train classification head
 4. Pretrained ViT + unfreeze last block
