@@ -3,6 +3,12 @@ name: Build and Push Docker Image for R1 Project
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Docker image tag"
+        required: true
+        default: "latest"
 
 jobs:
   docker:
@@ -35,4 +41,4 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/ashwanirathee/r1:latest
+          tags: ghcr.io/ashwanirathee/r1:${{ github.event.inputs.tag || 'latest' }}
