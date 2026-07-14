@@ -11,9 +11,10 @@ print("Using device:", device)
 model_name = "ViT-B-32"
 pretrained_dataset = "laion2b_s34b_b79k"
 tokenizer_model_name = model_name
+
 prompts = [
-    "a image with a yellow ball",
-    "a image with a no ball",
+    "a photo of a yellow ball",
+    "a photo with no ball",
 ]
 
 model, _, preprocess = open_clip.create_model_and_transforms(

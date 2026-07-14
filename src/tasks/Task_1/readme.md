@@ -38,10 +38,15 @@ utilizing a zero shot threshold based approach.
 
 We use the balanced F1 score (2 * precision * recall / (precision + recall)) to evaluate the performance of the models on the testing data. The inference time is measured in frames per second (FPS) on same machine.
 
-| Method      | Details  | F1 score | Inference Time (FPS) |
+| Method      | Details  | F1 score | Inference Time (ms) |
 |-------------|------------|----------| ---------------|
-| Open Clip   | yes_score > no_score or yes_prob > no_prob, zero shot classification | 0.920 | 13.57 ms |
-| Open Clip   | Validation data based threshold | 0.938 | 14 ms |
+| OpenCV      | Color thresholding, contour detection, and shape analysis | 0.970 | 1.1 ms |
+| Open Clip (ViT-B-16)  | yes_score > no_score or yes_prob > no_prob, zero shot classification | 0.861 | 20-44 ms |
+| Open Clip (ViT-B-16)  | Validation data based threshold on margin (yes_score-no_score)  | 0.881 | 20-44 ms |
+| Open Clip (ViT-B-32)  | yes_score > no_score or yes_prob > no_prob, zero shot classification | 0.929 | 13.57 ms |
+| Open Clip (ViT-B-32)  | Validation data based threshold on margin (yes_score-no_score) | 0.917 | 14 ms |
+| Qwen2.5vl:7b | Local but partially offloaded to CPU | 0.971 | 10419 ms |
+| Open Clip + Logistic Regression | Frozen Open Clip embeddings + logistic regression | 0.954 | 16 ms |
 
 ### Future Work:
 Add for comparison and evaluation of different methods for image classification:
@@ -54,3 +59,6 @@ Add for comparison and evaluation of different methods for image classification:
 6. Evaluate qwen3 and other models via ollama cloud and open router
 7. Implement active learning to select the most useful images to label and retrain the model live on device with continual learning.
 8. OpenCV based approach; parameter tuning is tricky part.
+9. Add CNN based approach; parameter tuning is tricky part.
+10. CNN + Classification NN head
+11. Parallelize the training and CNN, Vision Transformer, DDP, distibuted training.
