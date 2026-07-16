@@ -2,8 +2,7 @@ name: Deploy R1 Docs
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
     paths:
       - 'docs/**'
       - '.github/workflows/deploy-docs.yml'
