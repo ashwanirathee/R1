@@ -6,25 +6,53 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary: #2d8fd5;
+  --ifm-color-primary-dark: #247fc0;
+  --ifm-color-primary-darker: #2177b4;
+  --ifm-color-primary-darkest: #1b6395;
+  --ifm-color-primary-light: #48a3e0;
+  --ifm-color-primary-lighter: #5aade4;
+  --ifm-color-primary-lightest: #86c5ee;
+  --ifm-background-color: #f7fbff;
+  --ifm-navbar-background-color: #eaf5ff;
+  --ifm-footer-background-color: #1f5f95;
+  --ifm-link-color: #1f78b8;
+  --ifm-menu-color-active: #1f78b8;
+  --ifm-heading-color: #16354f;
   --ifm-code-font-size: 95%;
+  --ifm-code-background: #e8f4ff;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-color-primary: #76c6ff;
+  --ifm-color-primary-dark: #55b7fb;
+  --ifm-color-primary-darker: #42aef8;
+  --ifm-color-primary-darkest: #168bd5;
+  --ifm-color-primary-light: #9bd6ff;
+  --ifm-color-primary-lighter: #b2e0ff;
+  --ifm-color-primary-lightest: #d8efff;
+  --ifm-background-color: #0f1d2b;
+  --ifm-navbar-background-color: #12283b;
+  --ifm-footer-background-color: #0c1722;
+  --ifm-link-color: #9bd6ff;
+  --ifm-menu-color-active: #9bd6ff;
+  --ifm-heading-color: #d8efff;
+  --ifm-code-background: #18344c;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.navbar {
+  border-bottom: 1px solid #cfe8fb;
+  box-shadow: none;
+}
+
+.navbar__brand {
+  color: #16354f;
+}
+
+.footer--dark {
+  --ifm-footer-link-color: #d8efff;
+  --ifm-footer-title-color: #ffffff;
 }
