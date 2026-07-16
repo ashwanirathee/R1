@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - ash/docs
     paths:
       - 'docs/**'
       - '.github/workflows/deploy-docs.yml'
@@ -39,10 +38,15 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
+          git config --global --list
+
       - name: Deploy to gh-pages
         working-directory: docs
         env:
           GIT_USER: github-actions[bot]
           GIT_PASS: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: npm run deploy
