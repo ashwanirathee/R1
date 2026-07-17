@@ -5,7 +5,8 @@ on:
     branches: ["main"]
     paths:
       - 'docs/**'
-      - '.github/workflows/deploy-docs.yml'
+      - 'assets/logo.jpg'
+      - '.github/workflows/deploy_docs.yaml'
 
 permissions:
   contents: write
@@ -29,8 +30,14 @@ jobs:
         working-directory: docs
         run: npm ci
 
+      - name: Copy R1 image assets
+        working-directory: docs
+        run: cp ../assets/logo.jpg static/img/r1-logo.jpg
+
       - name: Build
         working-directory: docs
+        env:
+          DEPLOY_BASE_URL: /R1/
         run: npm run build
 
       - name: Configure Git user
@@ -42,6 +49,7 @@ jobs:
       - name: Deploy to gh-pages
         working-directory: docs
         env:
+          DEPLOY_BASE_URL: /R1/
           GIT_USER: github-actions[bot]
           GIT_PASS: ${{ secrets.GITHUB_TOKEN }}
           GIT_AUTHOR_NAME: github-actions[bot]
