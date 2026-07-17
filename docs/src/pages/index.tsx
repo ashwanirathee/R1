@@ -4,7 +4,6 @@ import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
-import r1Logo from '../assets/r1-logo.jpg';
 import styles from './index.module.css';
 
 const goals = [
@@ -76,7 +75,7 @@ function HomepageHeader() {
         </div>
         <img
           className={styles.heroImage}
-          src={r1Logo}
+          src="/img/r1-logo.jpg"
           alt="R1 robot platform"
         />
       </div>

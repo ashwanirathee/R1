@@ -30,10 +30,6 @@ jobs:
         working-directory: docs
         run: npm ci
 
-      - name: Copy R1 image assets
-        working-directory: docs
-        run: cp ../assets/logo.jpg src/assets/r1-logo.jpg
-
       - name: Build
         working-directory: docs
         env:
