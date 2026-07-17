@@ -32,12 +32,12 @@ jobs:
 
       - name: Copy R1 image assets
         working-directory: docs
-        run: cp ../assets/logo.jpg static/img/r1-logo.jpg
+        run: cp ../assets/logo.jpg src/assets/r1-logo.jpg
 
       - name: Build
         working-directory: docs
         env:
-          DEPLOY_BASE_URL: /R1/
+          BASE_URL: /
         run: npm run build
 
       - name: Configure Git user
@@ -49,7 +49,7 @@ jobs:
       - name: Deploy to gh-pages
         working-directory: docs
         env:
-          DEPLOY_BASE_URL: /R1/
+          BASE_URL: /
           GIT_USER: github-actions[bot]
           GIT_PASS: ${{ secrets.GITHUB_TOKEN }}
           GIT_AUTHOR_NAME: github-actions[bot]

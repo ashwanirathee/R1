@@ -1,10 +1,10 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
-import useBaseUrl from '@docusaurus/useBaseUrl';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
+import r1Logo from '../assets/r1-logo.jpg';
 import styles from './index.module.css';
 
 const goals = [
@@ -52,8 +52,6 @@ const futureDirections = [
 ];
 
 function HomepageHeader() {
-  const logoSrc = useBaseUrl('/img/r1-logo.jpg');
-
   return (
     <header className={clsx('hero', styles.heroBanner)}>
       <div className={clsx('container', styles.heroInner)}>
@@ -78,7 +76,7 @@ function HomepageHeader() {
         </div>
         <img
           className={styles.heroImage}
-          src={logoSrc}
+          src={r1Logo}
           alt="R1 robot platform"
         />
       </div>
