@@ -59,7 +59,7 @@ function HomepageHeader() {
             R1
           </Heading>
           <p className={styles.heroSubtitle}>
-            A Raspberry Pi 5-based Physical AI robot platform for experiments in
+            Raspberry Pi 5-based RC car for experiments in
             perception, reasoning, and control.
           </p>
           <div className={styles.buttons}>
@@ -111,11 +111,8 @@ export default function Home(): ReactNode {
       <main className={styles.main}>
         <Section id="overview" title="Overview">
           <p>
-            R1 is a small, always-on robot research platform. The repository is
-            less about theory and more about implementing a working system that
-            can run on real hardware, publish ROS 2 topics, inspect the world
-            through cameras, reason about events, and expose useful monitoring
-            while experiments are running.
+            R1 is a small ROS 2 car built to study real-time perception, planning,
+            control, and edge AI on resource-constrained hardware.
           </p>
           <p>
             The project is built around modular ROS 2 packages so perception,
