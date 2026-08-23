@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="RC car favicon">
+  <rect width="512" height="512" rx="96" fill="#0b1220"/>
+
+  <!-- speed streaks -->
+  <path d="M62 308 L164 286 L150 305 L62 322 Z" fill="#ff3b30"/>
+  <path d="M82 348 L178 326 L163 345 L82 361 Z" fill="#ff3b30"/>
+
+  <!-- rear wing -->
+  <path d="M126 199 L202 214 L222 252 L176 246 Z" fill="#f8fafc"/>
+  <path d="M178 245 L194 245 L208 276 L193 281 Z" fill="#cbd5e1"/>
+
+  <!-- chassis / body -->
+  <path d="M188 285
+           L232 248
+           L316 249
+           L362 286
+           L409 296
+           L430 322
+           L409 335
+           L359 329
+           L335 354
+           L208 354
+           L184 333
+           L157 327
+           Z"
+        fill="#f8fafc"/>
+
+  <!-- canopy -->
+  <path d="M242 263
+           L304 263
+           L340 290
+           L275 286
+           Z"
+        fill="#94a3b8"/>
+
+  <!-- side accent -->
+  <path d="M230 298 L345 307 L321 323 L218 314 Z" fill="#cbd5e1"/>
+
+  <!-- suspension -->
+  <g stroke="#e2e8f0" stroke-width="8" stroke-linecap="round">
+    <path d="M183 272 L166 309"/>
+    <path d="M407 288 L426 320"/>
+  </g>
+
+  <!-- wheels -->
+  <g>
+    <circle cx="166" cy="349" r="58" fill="#111827"/>
+    <circle cx="166" cy="349" r="38" fill="#f8fafc"/>
+    <circle cx="166" cy="349" r="16" fill="#0b1220"/>
+
+    <circle cx="395" cy="349" r="58" fill="#111827"/>
+    <circle cx="395" cy="349" r="38" fill="#f8fafc"/>
+    <circle cx="395" cy="349" r="16" fill="#0b1220"/>
+  </g>
+
+  <!-- wheel tread hints -->
+  <g fill="#334155">
+    <rect x="160" y="285" width="12" height="18" rx="4"/>
+    <rect x="160" y="395" width="12" height="18" rx="4"/>
+    <rect x="102" y="343" width="18" height="12" rx="4"/>
+    <rect x="212" y="343" width="18" height="12" rx="4"/>
+
+    <rect x="389" y="285" width="12" height="18" rx="4"/>
+    <rect x="389" y="395" width="12" height="18" rx="4"/>
+    <rect x="331" y="343" width="18" height="12" rx="4"/>
+    <rect x="441" y="343" width="18" height="12" rx="4"/>
+  </g>
+</svg>

@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'R1',
   tagline: 'ROS Based RC Car',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/rc_car_favicon.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
