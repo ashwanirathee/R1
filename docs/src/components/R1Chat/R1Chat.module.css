@@ -1,0 +1,227 @@
+.chatRoot {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9999;
+  font-family: inherit;
+}
+
+.bubble {
+  width: 64px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: #111827;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 24%);
+}
+
+.panel {
+  width: min(380px, calc(100vw - 32px));
+  height: 520px;
+  max-height: calc(100vh - 120px);
+  margin-bottom: 12px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 24%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  height: 48px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.header button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.userMsg,
+.assistantMsg {
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+.userMsg {
+  align-self: flex-end;
+  background: var(--ifm-color-primary);
+  color: white;
+}
+
+.assistantMsg {
+  align-self: flex-start;
+  background: var(--ifm-color-emphasis-100);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+}
+
+.composer button {
+  border: 0;
+  border-radius: 6px;
+  padding: 0 14px;
+  background: var(--ifm-color-primary);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.turnstileWrap {
+  min-height: 70px;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.turnstileWrap span {
+  display: block;
+  color: var(--ifm-color-danger);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sessionReady {
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.sessionReady span {
+  display: block;
+  color: var(--ifm-color-success);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.offlineBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-color-warning-contrast-background);
+  color: var(--ifm-color-warning-contrast-foreground);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.offlineBanner strong {
+  font-size: 13px;
+}
+
+.suggestions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.suggestions button {
+  flex: 0 0 auto;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.suggestions button:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.attachButton {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.attachButton:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.imagePreview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.imagePreview img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.messageImage {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
