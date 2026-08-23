@@ -4,6 +4,7 @@ import styles from "./R1Chat.module.css";
 type Message = {
   role: "user" | "assistant";
   text: string;
+  imageUrl?: string;
 };
 
 const API_URL = "https://api.ashwanirathee.com/r1/chat";
@@ -15,6 +16,22 @@ const FALLBACK_QUESTIONS = [
   "What experiments are included?",
   "What is the SLAM package?",
 ];
+
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.split(",")[1] ?? "");
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function getFallbackReply(text: string): string {
   const query = text.toLowerCase();
@@ -73,20 +90,50 @@ export default function R1Chat() {
   const [backendStatus, setBackendStatus] = useState<
     "unknown" | "online" | "offline"
   >("unknown");
+  const [selectedImage, setSelectedImage] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+
+  function clearSelectedImage() {
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage.previewUrl);
+    }
+
+    setSelectedImage(null);
+  }
 
   async function sendMessage(overrideText?: string) {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
+    const imageToSend = selectedImage;
+
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", text }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        text,
+        imageUrl: imageToSend?.previewUrl,
+      },
+    ]);
     setLoading(true);
 
     try {
+      const imagePayload = imageToSend
+        ? {
+            mime: imageToSend.file.type,
+            base64: await fileToBase64(imageToSend.file),
+          }
+        : null;
       const response = await fetchWithTimeout(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          image: imagePayload,
+        }),
       });
 
       if (!response.ok) {
@@ -102,11 +149,14 @@ export default function R1Chat() {
     } catch {
       setBackendStatus("offline");
       // If the API call fails, use a fallback response.
-      const fallback = getFallbackReply(text);
+      const fallback = imageToSend
+        ? "The live backend is offline, so I cannot inspect uploaded images right now."
+        : getFallbackReply(text);
 
       setMessages((prev) => [...prev, { role: "assistant", text: fallback }]);
     } finally {
       setLoading(false);
+      clearSelectedImage();
     }
   }
 
@@ -136,6 +186,13 @@ export default function R1Chat() {
                   message.role === "user" ? styles.userMsg : styles.assistantMsg
                 }
               >
+                {message.imageUrl && (
+                  <img
+                    className={styles.messageImage}
+                    src={message.imageUrl}
+                    alt=""
+                  />
+                )}
                 {message.text}
               </div>
             ))}
@@ -154,7 +211,51 @@ export default function R1Chat() {
               ))}
             </div>
           )}
+
+          {selectedImage && (
+            <div className={styles.imagePreview}>
+              <img src={selectedImage.previewUrl} alt="Selected upload" />
+              <button type="button" onClick={clearSelectedImage}>
+                Remove
+              </button>
+            </div>
+          )}
           <div className={styles.composer}>
+            <label className={styles.attachButton} aria-label="Attach image">
+              +
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+
+                  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        role: "assistant",
+                        text: "Please choose an image smaller than 5 MB.",
+                      },
+                    ]);
+                    event.target.value = "";
+                    return;
+                  }
+
+                  if (selectedImage) {
+                    URL.revokeObjectURL(selectedImage.previewUrl);
+                  }
+
+                  setSelectedImage({
+                    file,
+                    previewUrl: URL.createObjectURL(file),
+                  });
+
+                  event.target.value = "";
+                }}
+              />
+            </label>
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -163,7 +264,7 @@ export default function R1Chat() {
               }}
               placeholder="Ask Murphy..."
             />
-            <button type="button" onClick={sendMessage}>
+            <button type="button" onClick={() => sendMessage()}>
               Send
             </button>
           </div>
