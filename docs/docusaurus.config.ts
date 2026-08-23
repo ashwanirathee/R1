@@ -69,6 +69,7 @@ const config: Config = {
         {to: '/#hardware', label: 'Hardware', position: 'left'},
         {to: '/#components', label: 'Components', position: 'left'},
         {to: '/#running', label: 'Running', position: 'left'},
+        {to: '/simulation', label: 'Simulation', position: 'left'},
         {to: '/#future', label: 'Future', position: 'left'},
         {
           type: 'docSidebar',

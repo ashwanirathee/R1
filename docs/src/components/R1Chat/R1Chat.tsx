@@ -360,7 +360,7 @@ export default function R1Chat() {
       {open && (
         <div className={styles.panel}>
           <div className={styles.header}>
-            <span>Assistant</span>
+            <span>Agent Murphy</span>
             <button type="button" onClick={() => setOpen(false)}>
               x
             </button>
@@ -490,7 +490,7 @@ export default function R1Chat() {
         onClick={() => setOpen((value) => !value)}
         aria-label="Open R1 assistant"
       >
-        Chat
+        Agent
       </button>
     </div>
   );
