@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styles from "./R1Chat.module.css";
 
 type Message = {
@@ -7,7 +7,36 @@ type Message = {
   imageUrl?: string;
 };
 
+type Turnstile = {
+  render: (
+    container: HTMLElement,
+    options: {
+      sitekey: string;
+      theme?: "auto" | "light" | "dark";
+      size?: "normal" | "compact" | "flexible";
+      action?: string;
+      callback?: (token: string) => void;
+      "error-callback"?: (errorCode: string) => void;
+      "expired-callback"?: () => void;
+    }
+  ) => string;
+  reset: (widgetId?: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: Turnstile;
+    r1TurnstileScriptPromise?: Promise<void>;
+  }
+}
+
 const API_URL = "https://api.ashwanirathee.com/r1/chat";
+const SESSION_URL = "https://api.ashwanirathee.com/r1/chat/session";
+
+const TURNSTILE_SITE_KEY = "0x4AAAAAAEZX0_siEyyZJCxv";
+const TURNSTILE_SCRIPT_URL =
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
 const FALLBACK_QUESTIONS = [
   "What is R1?",
@@ -62,7 +91,7 @@ function getFallbackReply(text: string): string {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs = 10000
+  timeoutMs = 100000
 ) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -75,6 +104,42 @@ async function fetchWithTimeout(
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+function loadTurnstileScript(): Promise<void> {
+  if (window.turnstile) {
+    return Promise.resolve();
+  }
+
+  if (window.r1TurnstileScriptPromise) {
+    return window.r1TurnstileScriptPromise;
+  }
+
+  window.r1TurnstileScriptPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${TURNSTILE_SCRIPT_URL}"]`
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Cloudflare Turnstile.")),
+        { once: true }
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = TURNSTILE_SCRIPT_URL;
+    script.async = false;
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(new Error("Failed to load Cloudflare Turnstile."));
+    document.head.appendChild(script);
+  });
+
+  return window.r1TurnstileScriptPromise;
 }
 
 export default function R1Chat() {
@@ -94,6 +159,120 @@ export default function R1Chat() {
     file: File;
     previewUrl: string;
   } | null>(null);
+  const [chatSessionToken, setChatSessionToken] = useState("");
+  const [verifyingSession, setVerifyingSession] = useState(false);
+  const [turnstileError, setTurnstileError] = useState(false);
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!open || chatSessionToken) return;
+
+    let cancelled = false;
+    setTurnstileError(false);
+
+    loadTurnstileScript()
+      .then(() => {
+        if (
+          cancelled ||
+          !turnstileContainerRef.current ||
+          turnstileWidgetIdRef.current
+        ) {
+          return;
+        }
+
+        turnstileWidgetIdRef.current = window.turnstile?.render(
+          turnstileContainerRef.current,
+          {
+            sitekey: TURNSTILE_SITE_KEY,
+            theme: "auto",
+            size: "flexible",
+            action: "r1_chat",
+            callback: (token) => {
+              void createChatSession(token);
+            },
+            "error-callback": (errorCode) => {
+              console.error("Turnstile error:", errorCode);
+              setVerifyingSession(false);
+              setTurnstileError(true);
+            },
+            "expired-callback": () => {
+              setVerifyingSession(false);
+            },
+          }
+        ) ?? null;
+      })
+      .catch((error) => {
+        console.error("Failed to load Turnstile script:", error);
+        if (!cancelled) {
+          setTurnstileError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      const widgetId = turnstileWidgetIdRef.current;
+
+      if (widgetId && window.turnstile) {
+        window.turnstile.remove(widgetId);
+      }
+
+      turnstileWidgetIdRef.current = null;
+      setVerifyingSession(false);
+      setTurnstileError(false);
+    };
+  }, [open, chatSessionToken]);
+
+  async function createChatSession(turnstileToken: string) {
+    if (verifyingSession || chatSessionToken) return;
+
+    setVerifyingSession(true);
+    setTurnstileError(false);
+
+    try {
+      const response = await fetchWithTimeout(
+        SESSION_URL,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ turnstileToken }),
+        },
+        15000
+      );
+
+      if (!response.ok) {
+        console.error(
+          "Chat session verification failed:",
+          response.status,
+          await response.text()
+        );
+        throw new Error(`Session verification returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      const sessionToken = data.sessionToken || data.token;
+
+      if (!sessionToken) {
+        throw new Error("Session response did not include a token.");
+      }
+
+      setChatSessionToken(sessionToken);
+
+      if (turnstileWidgetIdRef.current) {
+        window.turnstile?.remove(turnstileWidgetIdRef.current);
+        turnstileWidgetIdRef.current = null;
+      }
+    } catch (error) {
+      console.error("Failed to create chat session:", error);
+      setTurnstileError(true);
+
+      if (turnstileWidgetIdRef.current) {
+        window.turnstile?.reset(turnstileWidgetIdRef.current);
+      }
+    } finally {
+      setVerifyingSession(false);
+    }
+  }
 
   function clearSelectedImage() {
     if (selectedImage) {
@@ -107,7 +286,21 @@ export default function R1Chat() {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
+    if (!chatSessionToken) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: turnstileError
+            ? "Security check could not load. Please refresh and try again."
+            : "Please complete the security check before sending.",
+        },
+      ]);
+      return;
+    }
+
     const imageToSend = selectedImage;
+    const sessionTokenToSend = chatSessionToken;
 
     setInput("");
     setMessages((prev) => [
@@ -133,10 +326,12 @@ export default function R1Chat() {
         body: JSON.stringify({
           message: text,
           image: imagePayload,
+          sessionToken: sessionTokenToSend,
         }),
       });
 
       if (!response.ok) {
+        console.error("Backend returned error:", response.status, await response.text());
         throw new Error(`Backend returned ${response.status}`);
       }
       setBackendStatus("online");
@@ -220,6 +415,20 @@ export default function R1Chat() {
               </button>
             </div>
           )}
+          {!chatSessionToken && (
+            <div className={styles.turnstileWrap}>
+              <div ref={turnstileContainerRef} />
+              {verifyingSession && <span>Verifying security check...</span>}
+              {turnstileError && (
+                <span>Security check failed to load. Refresh and try again.</span>
+              )}
+            </div>
+          )}
+          {chatSessionToken && (
+            <div className={styles.sessionReady}>
+              <span>Security check complete.</span>
+            </div>
+          )}
           <div className={styles.composer}>
             <label className={styles.attachButton} aria-label="Attach image">
               +
@@ -264,7 +473,11 @@ export default function R1Chat() {
               }}
               placeholder="Ask Murphy..."
             />
-            <button type="button" onClick={() => sendMessage()}>
+            <button
+              type="button"
+              onClick={() => sendMessage()}
+              disabled={loading || !chatSessionToken}
+            >
               Send
             </button>
           </div>

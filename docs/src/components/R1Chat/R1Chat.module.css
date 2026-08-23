@@ -106,6 +106,36 @@
   cursor: pointer;
 }
 
+.composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.turnstileWrap {
+  min-height: 70px;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.turnstileWrap span {
+  display: block;
+  color: var(--ifm-color-danger);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sessionReady {
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.sessionReady span {
+  display: block;
+  color: var(--ifm-color-success);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .offlineBanner {
   display: flex;
   flex-direction: column;
