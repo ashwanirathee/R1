@@ -52,6 +52,15 @@
   color: #16354f;
 }
 
+.navbar__link {
+  color: var(--ifm-color-primary);
+}
+
+.navbar__link:hover,
+.navbar__link--active {
+  color: var(--ifm-color-primary-dark);
+}
+
 .footer--dark {
   --ifm-footer-link-color: #d8efff;
   --ifm-footer-title-color: #ffffff;

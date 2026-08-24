@@ -1,30 +1,38 @@
 ---
 sidebar_position: 1
-slug: /
 title: Experiments
 ---
 
 # Experiments
 
-This section is a tutorial-style area for R1 experiments. Use it for research
-logs, repeatable workflows, model comparisons, and lessons learned while testing
-new robot capabilities.
+This section hosts the various experiments/sub tasks I have worked towards and how I think about those decisions
 
-## How To Use This Section
+## Experiment Template
 
-Each experiment page should explain:
+Copy this structure when adding a new experiment page.
 
-- the goal of the test
-- the setup and commands used
-- the result
-- what changed because of the result
+### Goal
 
-## Current Experiment Areas
+What are you trying to prove, disprove, or learn?
 
-- Vision classification in `src/tasks/task_1`
-- OpenCLIP zero-shot classification
-- Threshold and margin analysis
-- LLM-assisted classifiers
-- Human label analysis
+### Setup
 
-Start with [Vision Classification](./vision-classification).
+List the dataset, commands, model, hardware, prompts, thresholds, and important
+assumptions.
+
+```bash
+# command used for the experiment
+```
+
+### Result
+
+Record the most important numbers, observations, screenshots, logs, or failure
+cases.
+
+### Takeaway
+
+What changed because of this result?
+
+### Next Step
+
+What should be tested next?
