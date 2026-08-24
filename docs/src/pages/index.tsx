@@ -63,12 +63,12 @@ function HomepageHeader() {
             perception, reasoning, and control.
           </p>
           <div className={styles.buttons}>
-            <Link className="button button--primary button--lg" to="#goals">
-              Goals
+            <Link className="button button--primary button--lg" to="/simulation">
+              Try Simulation
             </Link>
             <Link
               className="button button--outline button--primary button--lg"
-              to="/experiments">
+              to="/experiments/intro">
               Experiments
             </Link>
           </div>
