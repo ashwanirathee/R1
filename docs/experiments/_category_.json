@@ -1,0 +1,8 @@
+{
+  "label": "Experiments",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Sub Goals within the bigger project"
+  }
+}

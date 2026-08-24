@@ -69,14 +69,16 @@ const config: Config = {
         {to: '/#hardware', label: 'Hardware', position: 'left'},
         {to: '/#components', label: 'Components', position: 'left'},
         {to: '/#running', label: 'Running', position: 'left'},
-        {to: '/simulation', label: 'Simulation', position: 'left'},
         {to: '/#future', label: 'Future', position: 'left'},
+        {to: '/simulation', label: 'Simulation', position: 'left'},
+
         {
           type: 'docSidebar',
           sidebarId: 'experimentsSidebar',
           position: 'left',
           label: 'Experiments',
         },
+        
         {
           href: 'https://github.com/ashwanirathee/R1',
           label: 'GitHub',
