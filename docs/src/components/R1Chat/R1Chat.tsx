@@ -490,7 +490,7 @@ export default function R1Chat() {
         onClick={() => setOpen((value) => !value)}
         aria-label="Open R1 assistant"
       >
-        Agent
+        Try Agent
       </button>
     </div>
   );

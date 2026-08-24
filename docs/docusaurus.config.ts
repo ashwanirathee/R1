@@ -70,7 +70,12 @@ const config: Config = {
         {to: '/#components', label: 'Components', position: 'left'},
         {to: '/#running', label: 'Running', position: 'left'},
         {to: '/#future', label: 'Future', position: 'left'},
-        {to: '/simulation', label: 'Simulation', position: 'left'},
+        {
+          to: '/simulation',
+          label: 'Simulation',
+          position: 'left',
+          className: 'navbar__link--simulation',
+        },
 
         {
           type: 'docSidebar',
@@ -124,7 +129,7 @@ const config: Config = {
           items: [
             {
               label: 'Experiments',
-              to: '/experiments',
+              to: '/experiments/intro',
             },
           ],
         },
