@@ -1,0 +1,30 @@
+description: R1 system prompt evaluation
+
+prompts:
+  - file://prompts/persona_1.txt
+  - file://prompts/persona_2.txt
+  - file://prompts/persona_3.txt
+  - file://prompts/persona_4.txt
+  - file://prompts/persona_5.txt
+
+providers:
+  - id: http
+    label: r1-local-llm
+    config:
+      url: http://127.0.0.1:3000/v1/chat/completions
+      method: POST
+      body:
+        messages:
+          - role: system
+            content: "{{prompt}}"
+          - role: user
+            content: "{{question}}"
+        stream: false
+        max_tokens: 250
+      transformResponse: json.choices[0].message.content
+
+tests: file://scripts/promptfoo_tests.yaml
+
+outputPath:
+  - scripts/results/promptfoo-results.json
+  - scripts/results/promptfoo-results.html
