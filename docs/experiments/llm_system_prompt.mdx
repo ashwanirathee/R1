@@ -127,6 +127,11 @@ features, benchmark numbers, hardware details, or live runtime status that are
 not present in the context.
 ```
 
+After this point, I realised I need to setup LLM and RAG else performance won't be
+good. I brought them under src/ as llm/ and rag/ as llm is enriched by rag. I 
+previously had a FastAPI->ollama and performance was not great. Albeit I'll switch
+to a faster backend. Current goal is correctness of the response.
+
 ### Takeaway
 
 What changed because of this result?

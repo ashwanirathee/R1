@@ -1,0 +1,9 @@
+__pycache__
+.venv/
+config/tokens.json
+index/
+.pytest_cache/
+config/
+data/
+src/medha.egg-info
+.env
