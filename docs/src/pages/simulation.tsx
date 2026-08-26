@@ -322,7 +322,7 @@ async function renderCarScene(
     if (settings.keyboard) {
       const throttle =
         Number(keyState.forward) - Number(keyState.backward);
-      const steering = Number(keyState.left) - Number(keyState.right);
+      const steering = Number(keyState.right) - Number(keyState.left);
       const isMoving = throttle !== 0 || steering !== 0;
       const leftWheelInput = throttle !== 0 ? throttle - steering * 0.35 : -steering;
       const rightWheelInput = throttle !== 0 ? throttle + steering * 0.35 : steering;
