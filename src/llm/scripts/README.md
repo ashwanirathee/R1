@@ -31,3 +31,47 @@ The generated rubric uses weighted assertions:
 - `llm-rubric` for directness, grounding, and uncertainty handling.
 - Special high-weight checks for known risky topics such as SLAM language,
   Turnstile secrets, and Cloudflare tunnel credentials.
+
+## Gold Context Eval
+
+Use this mode to compare system prompts with fixed repository context, separate
+from live RAG retrieval quality. The gold contexts live in
+`scripts/r1_project_gold_contexts.csv`.
+
+Generate the gold-context tests:
+
+```bash
+cd src/llm
+python3 scripts/build_promptfoo_gold_tests.py
+```
+
+This writes three test files:
+
+- `scripts/promptfoo_gold_tests.yaml`: all questions
+- `scripts/promptfoo_gold_tests.dev.yaml`: first 40 questions for prompt/rubric tuning
+- `scripts/promptfoo_gold_tests.holdout.yaml`: remaining questions for final evaluation
+
+Run the full gold-context eval directly against Ollama:
+
+```bash
+cd src/llm
+npx promptfoo@latest eval -c promptfooconfig.gold.yaml
+```
+
+Run only the 40-question development set:
+
+```bash
+cd src/llm
+npx promptfoo@latest eval -c promptfooconfig.gold.dev.yaml
+```
+
+Run only the holdout set after prompt/rubric tuning is finished:
+
+```bash
+cd src/llm
+npx promptfoo@latest eval -c promptfooconfig.gold.holdout.yaml
+```
+
+The outputs are written separately under `scripts/results/gold-context/`,
+`scripts/results/gold-context-dev/`, and
+`scripts/results/gold-context-holdout/`.
