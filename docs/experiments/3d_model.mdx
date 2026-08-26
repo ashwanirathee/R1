@@ -32,6 +32,33 @@ We tried three ways to generate the model:
 SFM is another method for this reconstruction, albeit we wanted to try learning
 methods this time. Work on SFM+GS: [GS Post](https://ashwanirathee.com/blog/2024-05-5-gs)
 
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "16px",
+    flexWrap: "wrap",
+  }}
+>
+  <figure style={{ width: "45%", margin: 0, textAlign: "center" }}>
+    <img
+      src="/img/car2.jpg"
+      alt="CAR 2"
+      style={{ width: "100%" }}
+    />
+    <figcaption>Original picture</figcaption>
+  </figure>
+
+  <figure style={{ width: "45%", margin: 0, textAlign: "center" }}>
+    <img
+      src="/img/car2_mask.png"
+      alt="Mask"
+      style={{ width: "100%" }}
+    />
+    <figcaption>Second generated result</figcaption>
+  </figure>
+</div>
+
 ### Result
 
 MeshyAI had very promising results. However, because of being on the
@@ -72,6 +99,7 @@ If you don't fix the transform, you might have this funny blooper waiting for yo
   <img src="/img/blooper.gif" alt="Output" style={{ width: "600px" }} />
 </div>
 
+Sound is from the original vehicle itself from video [here](https://www.youtube.com/watch?v=fSCKBSA0d0w)
 ### Takeaway
 
 This enabled us to have a realistic 3D model for our simulation and made us realise that
