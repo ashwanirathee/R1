@@ -8,16 +8,8 @@ version = "0.1.0"
 requires-python = ">=3.10,<3.15"
 dependencies = [
     "chromadb>=1.5.9",
-    "faiss-cpu>=1.8.0",
     "fastapi>=0.135.2",
-    "langchain>=0.3.0",
-    "langchain-community>=0.3.0",
-    "langchain-huggingface>=0.1.0",
-    "langchain-text-splitters>=0.3.0",
     "pypdf>=5.0.0",
-    "requests>=2.32.0",
-    "sentence-transformers>=3.0.0",
-    "unstructured>=0.18.32",
     "uvicorn>=0.42.0",
 ]
 

@@ -1,8 +1,7 @@
 import hashlib
 from pathlib import Path
 
-from unstructured.partition.auto import partition
-from unstructured.chunking.title import chunk_by_title
+from pypdf import PdfReader
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
 REPOSITORY_EXTENSIONS = {
@@ -28,6 +27,7 @@ REPOSITORY_IGNORED_DIRS = {
     ".pytest_cache",
     ".ruff_cache",
     ".venv",
+    ".venv_r1",
     "__pycache__",
     "build",
     "data",
@@ -35,6 +35,7 @@ REPOSITORY_IGNORED_DIRS = {
     "install",
     "log",
     "node_modules",
+    "tasks",
 }
 REPOSITORY_IGNORED_FILES = {
     ".DS_Store",
@@ -87,24 +88,16 @@ class IngestionService:
         self,
         file_path: Path,
         max_characters: int = 1000,
-        new_after_n_chars: int = 800,
         overlap: int = 100,
     ):
-        # Partition into semantic elements using Unstructured
-        elements = partition(filename=str(file_path))
+        suffix = file_path.suffix.lower()
+        if suffix == ".pdf":
+            reader = PdfReader(str(file_path))
+            text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        else:
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
 
-        # Chunk by title so sections stay together when possible
-        chunks = chunk_by_title(
-            elements,
-            max_characters=max_characters,
-            new_after_n_chars=new_after_n_chars,
-            overlap=overlap,
-            overlap_all=False,
-            multipage_sections=False,
-            combine_text_under_n_chars=400,
-        )
-
-        return chunks
+        return self.chunk_text(text, max_characters=max_characters, overlap=overlap)
 
     def chunk_text(
         self,
@@ -141,16 +134,10 @@ class IngestionService:
         folder = file_path.parent
         source = file_path.parent.name
         scope = source
-        for i, chunk in enumerate(chunks):
-            text = getattr(chunk, "text", "") or ""
+        for i, text in enumerate(chunks):
             text = text.strip()
             if not text:
                 continue
-
-            metadata = getattr(chunk, "metadata", None)
-
-            page_number = getattr(metadata, "page_number", None) if metadata else None
-            category = getattr(chunk, "category", None)
 
             ids.append(f"{relative_path}::chunk{i}")
             documents.append(text)
@@ -164,8 +151,6 @@ class IngestionService:
                     "file_hash": file_hash,
                     "chunk_index": i,
                     "total_chunks": total_chunks,
-                    "page": page_number,
-                    "element_category": category,
                 }
             )
 

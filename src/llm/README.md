@@ -9,9 +9,9 @@ Medha RAG context for website chat requests.
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-ollama pull qwen3:8b
+ollama pull qwen3:1.7b
 ollama serve
-OLLAMA_MODEL=qwen3:8b \
+OLLAMA_MODEL=qwen3:1.7b \
 MEDHA_BASE_URL=http://127.0.0.1:8000 \
 uvicorn app:app --host 127.0.0.1 --port 3000
 ```

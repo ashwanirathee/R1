@@ -60,7 +60,7 @@ async def chat(request: Request) -> Any:
         if frontend_request.image:
             user_text = (
                 f"{user_text}\n\n"
-                "The user attached an image, but this qwen3:8b backend is text-only. "
+                "The user attached an image, but this qwen3:1.7b backend is text-only. "
                 "Answer the text request and briefly say that image inspection is not available yet."
             )
         logger.info(

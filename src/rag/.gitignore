@@ -7,3 +7,5 @@ config/
 data/
 src/medha.egg-info
 .env
+launchd/*.plist
+!launchd/*.example.plist

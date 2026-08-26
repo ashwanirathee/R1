@@ -183,6 +183,7 @@ cython_debug/
 
 # Local deployment config and secrets
 cloudflared.yml
+cloudflared.token
 launchd/*.plist
 !launchd/*.example.plist
 
