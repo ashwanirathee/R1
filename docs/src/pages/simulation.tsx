@@ -40,6 +40,7 @@ const MUJOCO_MODULE_URL = "/mujoco/mujoco.js";
 const MUJOCO_WASM_URL = "/mujoco/mujoco.wasm";
 const CAR_XML_URL = "/mujoco/car.xml";
 const CAR_GLB_URL = "/mujoco/sam_model2.glb";
+const DRIVE_AUDIO_URL = "/mujoco/audio.mov";
 const DRIVE_BOUNDS = 0.46;
 const WHEEL_SPIN_RATE = 18;
 
@@ -173,6 +174,8 @@ async function renderCarScene(
   const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 10);
   camera.position.set(0.35, 0.34, 0.55);
   camera.lookAt(0, 0.04, 0);
+  const audioListener = new THREE.AudioListener();
+  camera.add(audioListener);
   const orbitControls = new OrbitControls(camera, renderer.domElement);
   orbitControls.target.set(0, 0.04, 0);
   orbitControls.enableDamping = true;
@@ -219,6 +222,14 @@ async function renderCarScene(
   const rawCar = await loadCarObject(glbUrl);
   const car = new THREE.Group();
   car.add(rawCar);
+  const motorSound = await loadMotorSound(audioListener);
+  const motorAudioState = {
+    volume: 0,
+    playbackRate: 0.9,
+  };
+  if (motorSound) {
+    car.add(motorSound);
+  }
   const driveWheels = {
     left: ["wheel_fl", "wheel_bl"]
       .map((name) => rawCar.getObjectByName(name))
@@ -286,6 +297,7 @@ async function renderCarScene(
     if (key === "s") keyState.backward = active;
     if (key === "a") keyState.left = active;
     if (key === "d") keyState.right = active;
+    updateMotorSound(motorSound, motorAudioState, 0, 0, isDriveInputActive());
   };
 
   const keyDown = (event: KeyboardEvent) => updateKey(event, true);
@@ -311,6 +323,7 @@ async function renderCarScene(
       const throttle =
         Number(keyState.forward) - Number(keyState.backward);
       const steering = Number(keyState.left) - Number(keyState.right);
+      const isMoving = throttle !== 0 || steering !== 0;
       const leftWheelInput = throttle !== 0 ? throttle - steering * 0.35 : -steering;
       const rightWheelInput = throttle !== 0 ? throttle + steering * 0.35 : steering;
 
@@ -329,8 +342,16 @@ async function renderCarScene(
       settings.y = THREE.MathUtils.clamp(settings.y, -DRIVE_BOUNDS, DRIVE_BOUNDS);
       spinWheels(driveWheels.left, leftWheelInput * deltaSeconds * WHEEL_SPIN_RATE);
       spinWheels(driveWheels.right, rightWheelInput * deltaSeconds * WHEEL_SPIN_RATE);
+      updateMotorSound(
+        motorSound,
+        motorAudioState,
+        leftWheelInput,
+        rightWheelInput,
+        isMoving
+      );
       applyPose();
     } else if (settings.idleRotation) {
+      updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       settings.heading += 0.006;
       applyPose();
     }
@@ -350,6 +371,7 @@ async function renderCarScene(
   controlsFolder?.add(settings, "keyboard").name("WASD drive").onChange((enabled: boolean) => {
     if (!enabled) {
       clearKeys();
+      updateMotorSound(motorSound, motorAudioState, 0, 0, false);
     }
   });
   controlsFolder?.add(settings, "driveSpeed", 0.05, 0.8, 0.01).name("Drive speed");
@@ -366,12 +388,18 @@ async function renderCarScene(
     car.rotation.y = -settings.heading;
   }
 
+  function isDriveInputActive() {
+    return keyState.forward || keyState.backward || keyState.left || keyState.right;
+  }
+
   return {
     dispose: () => {
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
+      updateMotorSound(motorSound, motorAudioState, 0, 0, false);
+      audioListener.context.close().catch(() => undefined);
       orbitControls.dispose();
       controlsFolder?.destroy();
       scene.traverse((object) => {
@@ -423,4 +451,65 @@ async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   });
 
   return group;
+}
+
+async function loadMotorSound(
+  listener: THREE.AudioListener
+): Promise<THREE.PositionalAudio | null> {
+  const motorSound = new THREE.PositionalAudio(listener);
+  motorSound.setLoop(true);
+  motorSound.setRefDistance(10);
+  motorSound.setRolloffFactor(0.15);
+  motorSound.setVolume(0);
+
+  try {
+    const buffer = await new THREE.AudioLoader().loadAsync(DRIVE_AUDIO_URL);
+    motorSound.setBuffer(buffer);
+    return motorSound;
+  } catch (error) {
+    console.warn(`Failed to load ${DRIVE_AUDIO_URL}:`, error);
+    return null;
+  }
+}
+
+function updateMotorSound(
+  motorSound: THREE.PositionalAudio | null,
+  state: { volume: number; playbackRate: number },
+  leftWheelInput: number,
+  rightWheelInput: number,
+  shouldPlay: boolean
+) {
+  if (!motorSound?.buffer) return;
+
+  const wheelIntensity = shouldPlay
+    ? THREE.MathUtils.clamp(
+        Math.max(Math.abs(leftWheelInput), Math.abs(rightWheelInput)),
+        0,
+        1
+      )
+    : 0;
+  const targetPlaybackRate = 1;
+  const targetVolume = shouldPlay ? 0.22 + 0.38 * wheelIntensity : 0;
+
+  state.playbackRate = THREE.MathUtils.lerp(
+    state.playbackRate,
+    targetPlaybackRate,
+    0.18
+  );
+  state.volume = THREE.MathUtils.lerp(state.volume, targetVolume, 0.16);
+
+  motorSound.setPlaybackRate(state.playbackRate);
+  motorSound.setVolume(state.volume);
+
+  if (!shouldPlay && state.volume < 0.01) {
+    if (motorSound.isPlaying) motorSound.pause();
+    return;
+  }
+
+  if (!motorSound.isPlaying) {
+    if (motorSound.context.state === "suspended") {
+      void motorSound.context.resume().catch(() => undefined);
+    }
+    motorSound.play();
+  }
 }
