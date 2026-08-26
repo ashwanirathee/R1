@@ -129,7 +129,7 @@ const config: Config = {
           items: [
             {
               label: 'Experiments',
-              to: '/experiments/intro',
+              to: '/experiments/',
             },
           ],
         },
