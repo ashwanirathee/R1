@@ -1,0 +1,83 @@
+---
+sidebar_position: 3
+title: 3D Model Generation
+---
+
+# 3D Model Generation
+
+This section discusses how to generate the 3D model for the simulation.
+The simulation uses Three.js for rendering and Mujoco for the physics
+simulation.
+
+### Goal
+
+How to get a reasonable 3D model of the physical R1 RC car?
+
+### Setup
+
+Previously, the car in simulation used to look like this:
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/old_car.jpg" alt="Output" style={{ width: "600px" }} />
+</div>
+
+And it is a bit flavorless, isn't it? So the goal was to have a 3D model of the 
+physical R1 RC car and use it in Three.js.
+
+We tried three ways to generate the model:
+- MeshyAI
+- Hunyuan3D-2
+- Sam3D
+
+SFM is another method for this reconstruction, albeit we wanted to try learning
+methods this time. Work on SFM+GS: [GS Post](https://ashwanirathee.com/blog/2024-05-5-gs)
+
+### Result
+
+MeshyAI had very promising results. However, because of being on the
+free plan, the generated assets would have been subject to a Creative Commons license, 
+which we did not want for this project. There was also little visibility into the 
+underlying generation process, even though the quality of the results was excellent.
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/meshyai.jpg" alt="Output" style={{ width: "600px" }} />
+</div>
+
+Hunyuan3D-2 had good results too, but based on the current demo we tried, it
+only gave a 3D mesh, not its corresponding textures.
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/hunyuan.jpg" alt="Output" style={{ width: "600px" }} />
+</div>
+
+Finally, SAM3D, which is a recent popular open weight/source 3D generation method by Meta.
+We tried setting it up on Google Colab, which didn't work, and had to switch to Nvidia's Brev GPU Cloud
+provider. Once the setup was done, SAM3D requires a single image and mask, which can be generated
+via SAM or OpenCV methods. Updated code is [here](https://github.com/ashwanirathee/sam-3d-objects)
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/sam3d.jpg" alt="Output" style={{ width: "600px" }} />
+</div>
+
+Then we used MeshLab to separate out the 4 wheels, name them, fix the light, axis, and origin in Blender, and 
+output a single model GLB.
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/blender_fix.jpg" alt="Output" style={{ width: "600px" }} />
+</div>
+
+If you don't fix the transform, you might have this funny blooper waiting for you.
+
+<div style={{ textAlign: "center" }}>
+  <img src="/img/blooper.gif" alt="Output" style={{ width: "600px" }} />
+</div>
+
+### Takeaway
+
+This enabled us to have a realistic 3D model for our simulation and made us realise that
+learning-based methods have gotten very good these days.
+
+### Next Step
+
+Improve the results for the 3D generation by tinkering with the SAM3D model further. Or try multiple images
+inside it if possible; else, try the SFM route.

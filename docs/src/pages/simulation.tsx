@@ -43,6 +43,8 @@ const CAR_GLB_URL = "/mujoco/sam_model2.glb";
 const DRIVE_AUDIO_URL = "/mujoco/audio.mov";
 const DRIVE_BOUNDS = 0.46;
 const WHEEL_SPIN_RATE = 18;
+const INITIAL_CAMERA_POSITION = new THREE.Vector3(0.32, 0.3, -0.62);
+const INITIAL_CAMERA_TARGET = new THREE.Vector3(0, 0.04, 0);
 
 async function importRuntimeModule(url: string): Promise<MujocoRuntimeModule> {
   const runtimeImport = new Function("url", "return import(url)") as (
@@ -172,12 +174,12 @@ async function renderCarScene(
   scene.fog = new THREE.Fog(0x14191f, 0.6, 2.8);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 10);
-  camera.position.set(0.35, 0.34, 0.55);
-  camera.lookAt(0, 0.04, 0);
+  camera.position.copy(INITIAL_CAMERA_POSITION);
+  camera.lookAt(INITIAL_CAMERA_TARGET);
   const audioListener = new THREE.AudioListener();
   camera.add(audioListener);
   const orbitControls = new OrbitControls(camera, renderer.domElement);
-  orbitControls.target.set(0, 0.04, 0);
+  orbitControls.target.copy(INITIAL_CAMERA_TARGET);
   orbitControls.enableDamping = true;
   orbitControls.dampingFactor = 0.08;
   orbitControls.screenSpacePanning = true;
@@ -251,7 +253,7 @@ async function renderCarScene(
     keyboard: true,
     driveSpeed: 0.28,
     steeringRate: 2.8,
-    idleRotation: true,
+    idleRotation: false,
     showGrid: true,
     x: 0,
     y: 0,
@@ -263,8 +265,8 @@ async function renderCarScene(
       applyPose();
     },
     resetCamera: () => {
-      camera.position.set(0.35, 0.34, 0.55);
-      orbitControls.target.set(0, 0.04, 0);
+      camera.position.copy(INITIAL_CAMERA_POSITION);
+      orbitControls.target.copy(INITIAL_CAMERA_TARGET);
       orbitControls.update();
     },
   };
@@ -336,6 +338,8 @@ async function renderCarScene(
           Math.cos(settings.heading) * throttle * deltaSeconds * settings.driveSpeed;
       } else if (steering !== 0) {
         settings.heading += steering * deltaSeconds * settings.steeringRate * 0.42;
+      } else if (settings.idleRotation) {
+        settings.heading += 0.006;
       }
 
       settings.x = THREE.MathUtils.clamp(settings.x, -DRIVE_BOUNDS, DRIVE_BOUNDS);

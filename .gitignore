@@ -27,8 +27,6 @@ env/
 
 # Generated runtime data
 vision_images/
-*.jpg
-*.jpeg
 *.png
 
 experimental/
