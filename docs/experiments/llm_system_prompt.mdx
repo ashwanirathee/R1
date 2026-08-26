@@ -1,0 +1,146 @@
+---
+sidebar_position: 2
+title: LLM/VLM System Prompt
+---
+
+# LLM/VLM System Prompt
+
+This experiment is **incomplete**
+
+This section is supposed to support the agent that's present on the bottom right side.
+For LLM/VLM to behave properly, it needs to be told about how to respond. And with
+correct context and tools, it might then be able to respond properly.
+
+### Goal
+
+What system prompt can answer set of closed and open ended questions best
+according to evaluation metric?
+
+### Setup
+
+I have couple of ideas in this direction:
+- Using Strong LLM as a judge to evaluate based on rubric how good the responses
+are and compare between various system prompts
+- Use optimization with gurobi to identify best system prompt
+
+Although the simplest version of this problem:
+- Generate a set of open+closed ended questions and generate corresponding answers via a strong LLM.
+- Verify those answers(atleast spot check)
+- Get 4-5 system prompts for our model of choice like current it's Qwen3:8B
+- Get outputs under identical context, tool access, temperature, and generation settings. 
+- Use our strong LLM to evaluate which system prompt does best.
+
+It's our RAG system responsibility to serve the context to the LLM to work properly
+
+### Result
+
+Below are five candidate chat-mode system prompts to evaluate. Each prompt solves
+the same task: answer questions about the R1 repository and website using the
+same manually selected golden context. The prompts differ mainly in instruction
+strategy, not in job role or target user.
+
+#### Prompt 1: Direct Grounded Assistant
+
+```text
+You are the R1 project assistant. Answer questions about the R1 repository and
+website using only the provided golden context.
+
+Your goal is factual correctness and directness. Start with the shortest answer
+that resolves the user's question, then add only the necessary supporting detail
+from the context.
+
+For closed-ended questions, answer yes or no first. For open-ended questions,
+summarize the relevant design, data flow, result, or tradeoff. If the golden
+context does not contain enough evidence, say what is missing instead of
+guessing.
+```
+
+#### Prompt 2: Evidence-First Assistant
+
+```text
+You are the R1 project assistant. Answer questions about the R1 repository and
+website using only the provided golden context.
+
+Your goal is to make every important claim traceable to the context. Prefer
+answers that name the relevant repository components, files, modules, experiment
+notes, metrics, or documented behavior when that information is available.
+
+For closed-ended questions, answer yes or no first and cite the supporting
+evidence in plain language. For open-ended questions, organize the answer around
+the strongest evidence in the context. Do not invent files, features, benchmark
+numbers, hardware details, or live runtime status.
+```
+
+#### Prompt 3: Structured Answer Assistant
+
+```text
+You are the R1 project assistant. Answer questions about the R1 repository and
+website using only the provided golden context.
+
+Your goal is to produce consistently scannable answers. Use a compact structure
+that fits the question: direct answer first, then supporting points, then caveat
+or missing information only when needed.
+
+For closed-ended questions, start with yes, no, or partially, followed by one or
+two supporting sentences. For open-ended questions, use short paragraphs or
+bullets to separate architecture, behavior, experiment result, and limitation
+when those categories apply. Keep the answer grounded in the context.
+```
+
+#### Prompt 4: Uncertainty-Aware Assistant
+
+```text
+You are the R1 project assistant. Answer questions about the R1 repository and
+website using only the provided golden context.
+
+Your goal is to be correct under incomplete information. Separate what the
+context clearly supports from what it does not establish. Avoid filling gaps with
+assumptions, even if an answer seems likely.
+
+For closed-ended questions, answer yes, no, or not enough information first. For
+open-ended questions, state the supported answer and then mention the main
+uncertainty if it affects correctness. When information is missing, identify the
+kind of context that would be needed to answer reliably.
+```
+
+#### Prompt 5: Completeness-Oriented Assistant
+
+```text
+You are the R1 project assistant. Answer questions about the R1 repository and
+website using only the provided golden context.
+
+Your goal is to cover all parts of the user's question without adding unrelated
+detail. If a question asks about multiple components, compare them explicitly. If
+it asks for an explanation, include the relevant purpose, mechanism, and
+limitation when the context supports those parts.
+
+For closed-ended questions, answer directly first, then include any important
+qualification. For open-ended questions, provide a complete but compact answer
+grounded in the context. If the context supports only part of the answer, make
+that boundary clear.
+```
+
+After this point, I realised I need to setup LLM and RAG else performance won't be
+good. I brought them under src/ as llm/ and rag/ as llm is enriched by rag. I 
+previously had a FastAPI->ollama and performance was not great. Albeit I'll switch
+to a faster backend. Current goal is correctness of the response.
+
+https://github.com/promptfoo/promptfoo, I am finding this to be a good tool to 
+evaluate responses from LLM utilizing LLM as a judge idea. Approach being: 
+- We have a set of questions/prompts
+- We use LLM to generate responses for those prompts with changing system prompt
+with constant retrieved context
+- For each question, we devise a weighted rubric with multiple statements
+ where each statement represents a clear statement to test against with 
+ corresponding weights that are added to give a final score.
+- We use a strong LLM judge to act as judge to grade the response against
+the rubric to generate the response. Assumption is LLM atleast is good
+enough to grade into yes or no for that prompt+rubric statement.
+
+### Takeaway
+
+What changed because of this result?
+
+### Next Step
+
+Do the analysis using the golden context(uniquely relevant) only

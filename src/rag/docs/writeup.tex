@@ -1,0 +1,102 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{Medha Writeup}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Overview}
+Medha is a lightweight FastAPI service that fronts a running ChromaDB instance. Each user receives a dedicated Chroma collection, and the API exposes signup, ingestion of unstructured data, folder-based chunking, and semantic query endpoints. The stack stays intentionally small: FastAPI/uvicorn for HTTP, ChromaDB for vector storage, \texttt{pypdf} for PDF parsing, and plain Python services for orchestration.
+
+\section{Core Components}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{run\_medha.py}: instantiates the FastAPI application and registers the versioned router.
+  \item \texttt{src/routers/v1.py}: defines the public HTTP surface (health, signup, ingestion, query, and collection inspection).
+  \item \texttt{src/services/chroma.py}: shared wrapper around \texttt{chromadb.HttpClient} pointed at \texttt{localhost:8000}.
+  \item \texttt{src/services/ingest.py}: handles PDF/Text/Markdown parsing, fixed-size chunking, and metadata enrichment before upserting into Chroma.
+  \item \texttt{src/services/user.py}: JSON-backed user and token registry stored in \texttt{data/users.json}.
+  \item \texttt{src/models/auth.py} and \texttt{src/models/access.py}: Pydantic models for request validation.
+  \item \texttt{src/token\_utils.py}: secure token + identifier generation helpers reused in the router.
+\end{itemize}
+
+\section{Technical Stack}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{HTTP Layer}: FastAPI with uvicorn, leveraging dependency injection to wire the router, user service, ingestion service, and Chroma client.
+  \item \textbf{Vector Database}: ChromaDB running as an external process with HTTP RPC via \texttt{chromadb.HttpClient}.
+  \item \textbf{Data Processing}: \texttt{pypdf} for PDF extraction, built-in \texttt{pathlib} filesystem walkers, and a custom chunking routine for unstructured text.
+  \item \textbf{Persistence}: Chroma collections store embeddings and metadata, while \texttt{data/users.json} keeps user credentials and scopes.
+  \item \textbf{Roadmap}: Future iterations will layer SQLAlchemy-managed SQL stores alongside Chroma so Medha can join structured records with vector search results once requirements stabilize.
+\end{itemize}
+
+\section{Data Model}
+All durable embeddings live inside Chroma collections. Medha tracks minimal state locally:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{data/users.json} --- usernames, plaintext passwords (local testing only), scopes, the issued bearer token, and the corresponding Chroma collection name.
+  \item Chunk metadata --- stores filename, file type, chunk index, and total chunk count inside Chroma metadatas.
+\end{itemize}
+Folder ingestion walks the requested directory, extracts text, slices it into 1{,}000-character chunks with 200-character overlap, and uploads each chunk with IDs of the form \texttt{relative/path::chunk\_index}.
+
+\section{Algorithms and Data Structures}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Sliding-Window Chunking}: implemented in \texttt{IngestionService.chunk\_text}, it advances by \texttt{chunk\_size - overlap} to retain context between chunks.
+  \item \textbf{Chunk Identifiers}: deterministic IDs \texttt{relative/path::chunk\_index} allow idempotent upserts and quick deduplication.
+  \item \textbf{Metadata Schema}: dictionary per chunk listing filename, path, file type, chunk index, and total chunks to support filtering within Chroma.
+  \item \textbf{User Registry}: list-of-dicts stored in JSON, accessed via linear scans (sufficient for the small local datasets Medha targets).
+\end{itemize}
+
+\section{Configuration}
+The current implementation assumes a Chroma server listening on \texttt{localhost:8000}. Host and port are hard-coded inside \texttt{ChromaService}, so any deployment must ensure reachability on that address. Runtime behavior (chunk size, overlap, supported file types) lives directly inside \texttt{src/services/ingest.py}.
+
+\section{External Sources}
+The ingestion endpoint accepts any folder that the API process can read. It recursively scans subdirectories for \texttt{.pdf}, \texttt{.txt}, and \texttt{.md} files, extracts all text, and inserts it into the authenticated user's collection.
+
+\section{API}
+The service exposes the following endpoints:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{GET /health}
+  \item \texttt{POST /v1/signup}
+  \item \texttt{POST /v1/add\_documents}
+  \item \texttt{POST /v1/query\_documents}
+  \item \texttt{POST /v1/ingest\_documents}
+  \item \texttt{POST /v1/collections}
+\end{itemize}
+Signup validates the requested scopes, mints a random bearer token, creates a Chroma collection, and writes the record to \texttt{data/users.json}. All other endpoints require that token and operate exclusively on the token-owned collection. Errors are returned as FastAPI HTTP exceptions.
+
+\section{Vector Database Integration}
+The FastAPI router delegates to \texttt{ChromaService} for all persistence:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{create\_collection} --- invoked on signup so every user token maps to a unique collection namespace.
+  \item \texttt{upsert} --- used by both document-add and folder-ingest paths to persist unstructured content plus metadata.
+  \item \texttt{query} --- backs the similarity search endpoint, returning whatever payload the Chroma HTTP API delivers.
+  \item \texttt{get} --- surfaces documents + metadata for collection inspection.
+\end{itemize}
+By constraining every call to the token-owned collection, Medha enforces tenant isolation even when multiple users share a Chroma instance.
+
+\section{Developer Workflow}
+Typical local commands:
+\begin{verbatim}
+cd medha
+uv sync
+uv run chroma run --host 127.0.0.1 --port 8000 --path ./data/chroma
+uv run uvicorn run_medha:app --host 127.0.0.1 --port 8051 --reload
+uv run pytest
+\end{verbatim}
+The helper script \texttt{run\_medha.sh} wraps the last command and defaults to serving on \texttt{0.0.0.0:8051} with auto-reload enabled.
+
+\section{Network Configuration}
+Binding to \texttt{0.0.0.0} via \texttt{./run\_medha.sh --host 0.0.0.0 --port 8051} exposes the API to other devices on the local network. Always secure the environment: use randomly generated tokens, keep the Chroma server behind trusted firewalls, and avoid placing plaintext credentials on shared disks.
+
+\section{Strong Token Generation}
+\texttt{src/token\_utils.py} exposes \texttt{generate\_strong\_token} (default length 40) and \texttt{generate\_unique\_id}. These helpers are reused inside the router but can also backfill entries in \texttt{data/users.json} if you need to seed accounts manually.
+
+\section{Current Direction}
+The project focuses on keeping the FastAPI surface small while leaning on Chroma for persistence, metadata filtering, and similarity search. Short-term priorities include stabilizing the new router, keeping ingestion simple (especially for unstructured PDFs/markdown), documenting user-management expectations, and making sure vector-database operations stay isolated per token so multi-user local deployments remain safe by default. In parallel, the team is exploring SQLAlchemy integration to pair Medha's semantic context with relational data sources, which will introduce database configuration, migrations, and blended query flows in upcoming revisions.
+
+\end{document}

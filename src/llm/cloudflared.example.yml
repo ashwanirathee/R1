@@ -1,0 +1,7 @@
+tunnel: replace-with-cloudflare-tunnel-id
+credentials-file: /Users/replace-me/.cloudflared/replace-with-cloudflare-tunnel-id.json
+
+ingress:
+  - hostname: r1-api.example.com
+    service: http://127.0.0.1:3000
+  - service: http_status:404

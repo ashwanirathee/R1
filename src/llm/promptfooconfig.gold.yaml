@@ -1,0 +1,38 @@
+description: R1 system prompt evaluation with fixed gold repository context
+
+prompts:
+  - file://prompts/persona_1.txt
+  - file://prompts/persona_2.txt
+  - file://prompts/persona_3.txt
+  - file://prompts/persona_4.txt
+  - file://prompts/persona_5.txt
+
+providers:
+  - id: http
+    label: qwen3-1.7b-gold-context
+    config:
+      url: http://127.0.0.1:11434/api/chat
+      method: POST
+      body:
+        model: qwen3:1.7b
+        messages:
+          - role: system
+            content: "{{prompt}}"
+          - role: user
+            content: |
+              Retrieved repository context:
+              {{gold_context}}
+
+              User question:
+              {{question}}
+        stream: false
+        think: false
+        options:
+          num_predict: 250
+      transformResponse: json.message.content
+
+tests: file://scripts/promptfoo_gold_tests.yaml
+
+outputPath:
+  - scripts/results/gold-context/promptfoo-gold-results.json
+  - scripts/results/gold-context/promptfoo-gold-results.html
