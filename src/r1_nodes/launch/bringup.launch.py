@@ -16,6 +16,8 @@ def generate_launch_description():
     enable_3dobd = LaunchConfiguration("enable_3dobd")
     yolo_camera_uid = LaunchConfiguration("yolo_camera_uid")
     enable_ear = LaunchConfiguration("enable_ear")
+    enable_ball_classifier = LaunchConfiguration("enable_ball_classifier")
+    ball_classifier_camera_uid = LaunchConfiguration("ball_classifier_camera_uid")
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
     enable_web = LaunchConfiguration("enable_web")
@@ -91,6 +93,16 @@ def generate_launch_description():
                 "enable_ear",
                 default_value="true",
                 description="Start ear_node for terminal text input.",
+            ),
+            DeclareLaunchArgument(
+                "enable_ball_classifier",
+                default_value="false",
+                description="Start ball_classifier_node for yellow-ball detection.",
+            ),
+            DeclareLaunchArgument(
+                "ball_classifier_camera_uid",
+                default_value="10",
+                description="Camera uid whose image stream should be used by ball_classifier_node.",
             ),
             DeclareLaunchArgument(
                 "enable_vlm",
@@ -217,6 +229,14 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(enable_vlm),
+            ),
+             Node(
+                package="r1",
+                executable="ball_classifier_node",
+                name="ball_classifier_node",
+                output="screen",
+                parameters=[{"camera_uid": ball_classifier_camera_uid}],
+                condition=IfCondition(enable_ball_classifier),
             ),
             Node(
                 package="r1_web",

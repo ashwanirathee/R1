@@ -31,5 +31,6 @@ setup(
         'r1/launchers/ear_node',
         'r1/launchers/action_node',
         'r1/launchers/vlm_node',
+        'r1/launchers/ball_classifier_node'
     ],
 )

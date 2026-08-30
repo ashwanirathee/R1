@@ -47,7 +47,8 @@ ros2 launch r1 bringup.launch.py \
   enable_audio:=false \
   enable_vlm:=false \
   enable_2dobd:=false \
-  enable_3dobd:=false
+  enable_3dobd:=false \
+  enable_ball_classifier:=true 
 
 # to launch foxglove_bridge
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
@@ -76,7 +77,7 @@ docker run -it --rm \
   r1-ros:latest
 
 # to enter already running docker container  
-docker exec -it r1 bash
+docker exec -it r1-ros bash
 
 # remove the container
 docker rmi r1-ros
