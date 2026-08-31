@@ -24,8 +24,14 @@ def generate_launch_description():
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
     enable_web = LaunchConfiguration("enable_web")
+    enable_sensors = LaunchConfiguration("enable_sensors")
+    enable_wheels = LaunchConfiguration("enable_wheels")
+    enable_ptz = LaunchConfiguration("enable_ptz")
+    gpio_chip = LaunchConfiguration("gpio_chip")
     event_min_interval_sec = LaunchConfiguration("event_min_interval_sec")
     event_max_silence_sec = LaunchConfiguration("event_max_silence_sec")
+    imu_update_interval_sec = LaunchConfiguration("imu_update_interval_sec")
+    sensor_publish_interval_sec = LaunchConfiguration("sensor_publish_interval_sec")
     slam_camera_topic = LaunchConfiguration("slam_camera_topic")
     slam_focal_length = LaunchConfiguration("slam_focal_length")
     slam_principal_point_x = LaunchConfiguration("slam_principal_point_x")
@@ -138,6 +144,36 @@ def generate_launch_description():
                 description="Start the web dashboard node.",
             ),
             DeclareLaunchArgument(
+                "enable_sensors",
+                default_value="true",
+                description="Start sensor_node for onboard sensor telemetry.",
+            ),
+            DeclareLaunchArgument(
+                "enable_wheels",
+                default_value="false",
+                description="Allow action_node to access wheel hardware.",
+            ),
+            DeclareLaunchArgument(
+                "enable_ptz",
+                default_value="false",
+                description="Allow action_node to access PTZ hardware.",
+            ),
+            DeclareLaunchArgument(
+                "gpio_chip",
+                default_value="0",
+                description="GPIO character device number used by wheel and PTZ hardware.",
+            ),
+            DeclareLaunchArgument(
+                "imu_update_interval_sec",
+                default_value="0.5",
+                description="Polling interval for IMU hardware access.",
+            ),
+            DeclareLaunchArgument(
+                "sensor_publish_interval_sec",
+                default_value="0.5",
+                description="Publish interval for sensor telemetry topics.",
+            ),
+            DeclareLaunchArgument(
                 "slam_camera_topic",
                 default_value="/camera/uid_0/image_raw",
                 description="Image topic for the monocular SLAM node.",
@@ -211,6 +247,27 @@ def generate_launch_description():
                 executable="action_node",
                 name="action_node",
                 output="screen",
+                parameters=[
+                    {
+                        "enable_wheels": enable_wheels,
+                        "enable_ptz": enable_ptz,
+                        "gpio_chip": gpio_chip,
+                    }
+                ],
+            ),
+            Node(
+                package="r1",
+                executable="sensor_node",
+                name="sensor_node",
+                output="screen",
+                parameters=[
+                    {
+                        "enable_imu": enable_sensors,
+                        "imu_update_interval_sec": imu_update_interval_sec,
+                        "publish_interval_sec": sensor_publish_interval_sec,
+                    }
+                ],
+                condition=IfCondition(enable_sensors),
             ),
             Node(
                 package="r1",

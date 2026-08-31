@@ -5,11 +5,29 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <h1>R1 Robot's Dashboard</h1>
+  <main class="panel">
+    <h1>R1 Robot Dashboard</h1>
+    <p id="status">Loading...</p>
 
-  <p id="status">Loading...</p>
-
-  <button onclick="sendTest()">Send Test Message</button>
+    <section class="panel teleop-panel">
+      <h2>Teleop</h2>
+      <p class="teleop-help">
+        Use <strong>W A S D</strong> to drive, <strong>Q / E</strong> to pan, <strong>Space</strong> to stop.
+      </p>
+      <div class="teleop-grid">
+        <button data-key="w">W</button>
+        <button data-key="q">Q</button>
+        <button data-key="e">E</button>
+        <button data-key="a">A</button>
+        <button data-key="s">S</button>
+        <button data-key="d">D</button>
+        <button data-key="z">Z</button>
+        <button data-key=" ">STOP</button>
+        <button data-key="c">C</button>
+      </div>
+      <p id="teleop-status">Teleop ready.</p>
+    </section>
+  </main>
 
   <script src="/static/app.js"></script>
 </body>

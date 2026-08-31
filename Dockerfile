@@ -11,6 +11,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3-requests \
     python3-numpy \
     python3-yaml \
+    python3-gpiozero \
+    python3-lgpio \
     espeak \
     alsa-utils \
     sox \
@@ -26,10 +28,11 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cpu
 
 # Normal Python packages WITH dependencies
-RUN python3 -m pip install --break-system-packages --no-cache-dir \
+RUN python3 -m pip install --break-system-packages --ignore-installed --no-cache-dir \
     requests \
     "fastapi[standard]" \
     uvicorn \
+    "numpy==1.26.4" \
     matplotlib \
     cycler \
     kiwisolver \

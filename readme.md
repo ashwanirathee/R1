@@ -48,7 +48,12 @@ ros2 launch r1 bringup.launch.py \
   enable_vlm:=false \
   enable_2dobd:=false \
   enable_3dobd:=false \
-  enable_detector:=true 
+  enable_detector:=false \
+  enable_sampler:=false \
+  enable_wheels:=true \
+  enable_ptz:=true \
+  enable_sensors:=true \
+  gpio_chip:=4
 
 # to launch foxglove_bridge
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
@@ -70,6 +75,8 @@ docker run -it --rm \
   --user $(id -u):$(id -g) \
   --add-host=host.docker.internal:host-gateway \
   --group-add video \
+  --device /dev/gpiochip0:/dev/gpiochip0 \
+  --group-add $(getent group gpio | cut -d: -f3) \
   --device /dev/video10 \
   -p 8765:8765 \
   -p 8002:8002 \
@@ -82,6 +89,17 @@ docker exec -it r1-ros bash
 # remove the container
 docker rmi r1-ros
 ```
+
+The wheel and PTZ controllers need `gpiozero` and GPIO device access. The Docker
+command above exposes the `gpiochip` interface used on newer Raspberry Pi
+systems. If your host also has `/dev/gpiomem`, you can add
+`--device /dev/gpiomem:/dev/gpiomem`, but it is optional and should be omitted
+when that device file does not exist. After changing the image or command,
+rebuild, recreate the container, and source `install/setup.bash` before
+launching. If the GPIO pins are exposed through `/dev/gpiochip4`, also pass
+`--device /dev/gpiochip4:/dev/gpiochip4` and launch with `gpio_chip:=4`.
+The Teleop panel reports the action-node execution result, so a
+`200` response no longer looks like a motor success.
 
 ### Specific Nodes behaviors:
 
@@ -101,6 +119,35 @@ ros2 topic pub --once /audio/heard_text std_msgs/msg/String "{data: 'how many ca
 
 # run the speaker bridge in the host machine to forward audio from ROS to the bluetooth speaker
 /home/murphy/Documents/r1/src/speaker_bridge.sh
+```
+##### Camera Node access
+```
+sudo apt install v4l2loopback-dkms v4l2loopback-utils ffmpeg
+
+sudo modprobe v4l2loopback \
+  video_nr=10 \
+  card_label="R1 Camera" \
+  exclusive_caps=1
+
+v4l2-ctl --list-devices
+
+rpicam-vid \
+  -t 0 \
+  --width 1280 \
+  --height 720 \
+  --framerate 30 \
+  --codec yuv420 \
+  -o - \
+| ffmpeg \
+    -f rawvideo \
+    -pixel_format yuv420p \
+    -video_size 1280x720 \
+    -framerate 30 \
+    -i - \
+    -f v4l2 \
+    -pix_fmt yuv420p \
+    /dev/video10
+
 ```
 
 ##### VLM Node:

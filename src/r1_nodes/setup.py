@@ -30,6 +30,7 @@ setup(
         'r1/launchers/audio_node',
         'r1/launchers/ear_node',
         'r1/launchers/action_node',
+        'r1/launchers/sensor_node',
         'r1/launchers/vlm_node',
         'r1/launchers/detector_node',
         'r1/launchers/sampler_node',
