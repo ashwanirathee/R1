@@ -16,8 +16,8 @@ def generate_launch_description():
     enable_3dobd = LaunchConfiguration("enable_3dobd")
     yolo_camera_uid = LaunchConfiguration("yolo_camera_uid")
     enable_ear = LaunchConfiguration("enable_ear")
-    enable_ball_classifier = LaunchConfiguration("enable_ball_classifier")
-    ball_classifier_camera_uid = LaunchConfiguration("ball_classifier_camera_uid")
+    enable_detector = LaunchConfiguration("enable_detector")
+    detector_camera_uid = LaunchConfiguration("detector_camera_uid")
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
     enable_web = LaunchConfiguration("enable_web")
@@ -95,14 +95,14 @@ def generate_launch_description():
                 description="Start ear_node for terminal text input.",
             ),
             DeclareLaunchArgument(
-                "enable_ball_classifier",
+                "enable_detector",
                 default_value="false",
-                description="Start ball_classifier_node for yellow-ball detection.",
+                description="Start detector_node for object detection.",
             ),
             DeclareLaunchArgument(
-                "ball_classifier_camera_uid",
+                "detector_camera_uid",
                 default_value="10",
-                description="Camera uid whose image stream should be used by ball_classifier_node.",
+                description="Camera uid whose image stream should be used by detector_node.",
             ),
             DeclareLaunchArgument(
                 "enable_vlm",
@@ -232,11 +232,11 @@ def generate_launch_description():
             ),
              Node(
                 package="r1",
-                executable="ball_classifier_node",
-                name="ball_classifier_node",
+                executable="detector_node",
+                name="detector_node",
                 output="screen",
-                parameters=[{"camera_uid": ball_classifier_camera_uid}],
-                condition=IfCondition(enable_ball_classifier),
+                parameters=[{"camera_uid": detector_camera_uid}],
+                condition=IfCondition(enable_detector),
             ),
             Node(
                 package="r1_web",

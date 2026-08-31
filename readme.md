@@ -48,7 +48,7 @@ ros2 launch r1 bringup.launch.py \
   enable_vlm:=false \
   enable_2dobd:=false \
   enable_3dobd:=false \
-  enable_ball_classifier:=true 
+  enable_detector:=true 
 
 # to launch foxglove_bridge
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
