@@ -54,18 +54,27 @@ class DetectorNode(Node):
                 class_id = int(cls.item())
 
                 output.append({
-                    # "class_id": class_id,
+                    "class_id": class_id,
                     "class_name": result.names[class_id],
                     "confidence": float(conf.item()),
-
-                    # "xywh": xywh.tolist(),
-                    # "xywhn": xywhn.tolist(),
-                    # "xyxy": xyxy.tolist(),
-                    # "xyxyn": xyxyn.tolist(),
+                    "bbox": xywhn.tolist(),
                 })
 
+        stamp_ns = (
+            msg.header.stamp.sec * 1_000_000_000
+            + msg.header.stamp.nanosec
+        )
+
+        payload = {
+            "stamp_ns": stamp_ns,
+            "camera_uid": self.camera_uid,
+            "model": "yolo26n.pt",
+            "detections": output,
+        }
+
         ros_msg = String()
-        ros_msg.data = json.dumps(output)
+        ros_msg.data = json.dumps(payload)
+
         self.event_pub.publish(ros_msg)
             
 def main(args=None):

@@ -18,6 +18,9 @@ def generate_launch_description():
     enable_ear = LaunchConfiguration("enable_ear")
     enable_detector = LaunchConfiguration("enable_detector")
     detector_camera_uid = LaunchConfiguration("detector_camera_uid")
+    enable_sampler = LaunchConfiguration("enable_sampler")
+    sampler_camera_uid = LaunchConfiguration("sampler_camera_uid")
+    sampler_save_dir = LaunchConfiguration("sampler_save_dir")
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
     enable_web = LaunchConfiguration("enable_web")
@@ -103,6 +106,21 @@ def generate_launch_description():
                 "detector_camera_uid",
                 default_value="10",
                 description="Camera uid whose image stream should be used by detector_node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_sampler",
+                default_value="false",
+                description="Start sampler_node for detector event sampling.",
+            ),
+            DeclareLaunchArgument(
+                "sampler_camera_uid",
+                default_value="10",
+                description="Camera uid whose detector events should be sampled.",
+            ),
+            DeclareLaunchArgument(
+                "sampler_save_dir",
+                default_value="./flywheel/raw",
+                description="Directory where sampler_node saves sampled images and metadata.",
             ),
             DeclareLaunchArgument(
                 "enable_vlm",
@@ -237,6 +255,19 @@ def generate_launch_description():
                 output="screen",
                 parameters=[{"camera_uid": detector_camera_uid}],
                 condition=IfCondition(enable_detector),
+            ),
+            Node(
+                package="r1",
+                executable="sampler_node",
+                name="sampler_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": sampler_camera_uid,
+                        "save_dir": sampler_save_dir,
+                    }
+                ],
+                condition=IfCondition(enable_sampler),
             ),
             Node(
                 package="r1_web",
