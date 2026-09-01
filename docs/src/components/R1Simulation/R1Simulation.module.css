@@ -3,39 +3,6 @@
   min-height: calc(100vh - var(--ifm-navbar-height));
 }
 
-.hero {
-  padding: 3.5rem 0 2.5rem;
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
-  background: #eef7fb;
-}
-
-.heroInner {
-  max-width: 920px;
-}
-
-.eyebrow {
-  margin: 0 0 0.75rem;
-  color: var(--ifm-color-primary);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.title {
-  margin: 0 0 1rem;
-  font-size: clamp(2.25rem, 5vw, 4.25rem);
-  line-height: 1;
-}
-
-.subtitle {
-  max-width: 720px;
-  margin: 0;
-  color: #38536a;
-  font-size: 1.2rem;
-  line-height: 1.5;
-}
-
 .main {
   min-height: calc(100vh - var(--ifm-navbar-height));
   padding: 0;
@@ -96,10 +63,6 @@
 }
 
 @media screen and (max-width: 996px) {
-  .hero {
-    padding: 2.5rem 0 2rem;
-  }
-
   .viewport {
     min-height: calc(100vh - var(--ifm-navbar-height));
   }
