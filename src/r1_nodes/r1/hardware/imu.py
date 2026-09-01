@@ -41,8 +41,7 @@ class IMUReader:
 
     def _run(self):
         try:
-            import board
-            import busio
+            from adafruit_extended_bus import ExtendedI2C
             from adafruit_bno08x import (
                 BNO_REPORT_ACCELEROMETER,
                 BNO_REPORT_GYROSCOPE,
@@ -51,7 +50,9 @@ class IMUReader:
             )
             from adafruit_bno08x.i2c import BNO08X_I2C
 
-            i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+            # Address the Linux I2C device directly so Blinka need not detect
+            # the host board from inside the container.
+            i2c = ExtendedI2C(1, frequency=400000)
             bno = BNO08X_I2C(i2c)
             bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             bno.enable_feature(BNO_REPORT_GYROSCOPE)

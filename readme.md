@@ -51,7 +51,7 @@ ros2 launch r1 bringup.launch.py \
   enable_detector:=false \
   enable_sampler:=false \
   enable_wheels:=true \
-  enable_ptz:=true \
+  enable_ptz:=false \
   enable_sensors:=true \
   gpio_chip:=4
 
@@ -76,8 +76,11 @@ docker run -it --rm \
   --add-host=host.docker.internal:host-gateway \
   --group-add video \
   --device /dev/gpiochip0:/dev/gpiochip0 \
+  --device /dev/gpiochip4:/dev/gpiochip4 \
   --group-add $(getent group gpio | cut -d: -f3) \
   --device /dev/video10 \
+  --device /dev/i2c-1:/dev/i2c-1 \
+  --group-add $(stat -c '%g' /dev/i2c-1) \
   -p 8765:8765 \
   -p 8002:8002 \
   -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
@@ -100,6 +103,14 @@ launching. If the GPIO pins are exposed through `/dev/gpiochip4`, also pass
 `--device /dev/gpiochip4:/dev/gpiochip4` and launch with `gpio_chip:=4`.
 The Teleop panel reports the action-node execution result, so a
 `200` response no longer looks like a motor success.
+
+The BNO08X IMU additionally needs the host I2C bus. When the sensor is
+connected on `/dev/i2c-1`, add these Docker flags:
+
+```
+  --device /dev/i2c-1:/dev/i2c-1 \
+  --group-add $(stat -c '%g' /dev/i2c-1) \
+```
 
 ### Specific Nodes behaviors:
 

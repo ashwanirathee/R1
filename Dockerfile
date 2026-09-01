@@ -42,7 +42,10 @@ RUN python3 -m pip install --break-system-packages --ignore-installed --no-cache
     packaging \
     python-dateutil \
     onnx \
-    onnxruntime
+    onnxruntime \
+    adafruit-blinka \
+    adafruit-extended-bus \
+    adafruit-circuitpython-bno08x
 
 # Ultralytics without dependencies, to avoid it changing your torch/opencv stack
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
