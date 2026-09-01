@@ -12,6 +12,13 @@ import {
   loadMotorSound,
   updateMotorSound,
 } from "./motorSound";
+import {
+  addMoonEnvironment,
+  createMujocoCarModelDebug,
+  createObstacleDebugBox,
+  createObstacleMesh,
+} from "./moonEnvironment";
+import { parseMujocoHfield } from "./moonTerrain";
 import type { GuiInstance, MujocoSimulation, ThreeSceneHandle } from "./types";
 
 const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
@@ -22,6 +29,8 @@ const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
   )
 );
 const THREE_TO_MUJOCO_QUATERNION = MUJOCO_TO_THREE_QUATERNION.clone().invert();
+const OBSTACLE_LIMIT = 5;
+const EULER = new THREE.Euler(0, 0, 0, "YXZ");
 
 export async function renderCarScene(
   glbUrl: string,
@@ -36,14 +45,19 @@ export async function renderCarScene(
   const renderer = createRenderer(canvas);
   const scene = createScene();
   const camera = createCamera();
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
   const audioListener = new THREE.AudioListener();
   camera.add(audioListener);
 
   const orbitControls = createOrbitControls(camera, renderer.domElement);
-  const grid = addLightingAndGround(scene);
+  const environment = addMoonEnvironment(scene, parseMujocoHfield(mujoco.xml));
+  const grid = environment.grid;
   const rawCar = await loadCarObject(glbUrl);
   const car = new THREE.Group();
   car.add(rawCar);
+  const mujocoCarDebug = createMujocoCarModelDebug();
+  environment.debugGroup.add(mujocoCarDebug);
 
   const motorSound = await loadMotorSound(audioListener);
   const motorAudioState = createMotorAudioState();
@@ -62,6 +76,18 @@ export async function renderCarScene(
 
   scene.add(car);
 
+  const obstacleSlots: Array<THREE.Mesh | null> = Array.from(
+    { length: OBSTACLE_LIMIT },
+    () => null
+  );
+  const obstacleDebugSlots: Array<THREE.LineSegments | null> = Array.from(
+    { length: OBSTACLE_LIMIT },
+    () => null
+  );
+  let nextObstacleIndex = 0;
+  const debugState = {
+    contacts: 0,
+  };
   const keyState = {
     forward: false,
     backward: false,
@@ -70,10 +96,23 @@ export async function renderCarScene(
   };
   const settings = {
     keyboard: true,
-    drivePower: 0.8,
-    turnPower: 0.65,
+    drivePower: 1.2,
+    turnPower: 0.9,
     idleRotation: false,
     showGrid: true,
+    showVisualCar: true,
+    showVisualTerrain: true,
+    showPhysicsDebug: false,
+    stabilizeVisualRoll: true,
+    clickToAddRock: true,
+    obstacleSize: 0.065,
+    obstacleDistance: 0.34,
+    addObstacle: () => {
+      addObstacleInFront();
+    },
+    clearObstacles: () => {
+      clearObstacles();
+    },
     resetPose: () => {
       mujoco.reset();
       mujoco.setControls(0, 0);
@@ -100,22 +139,112 @@ export async function renderCarScene(
 
   const applyPose = () => {
     const { position, quaternion } = mujoco.getCarPose();
-    car.position.set(-position[1], position[2], -position[0]);
+    const x = -position[1];
+    const z = -position[0];
+    environment.updateTerrainWindow(x, z);
+    car.position.set(x, position[2], z);
     car.quaternion
       .set(quaternion[1], quaternion[2], quaternion[3], quaternion[0])
       .premultiply(MUJOCO_TO_THREE_QUATERNION)
       .multiply(THREE_TO_MUJOCO_QUATERNION);
+    mujocoCarDebug.position.copy(car.position);
+    mujocoCarDebug.quaternion.copy(car.quaternion);
+
+    if (settings.stabilizeVisualRoll) {
+      EULER.setFromQuaternion(car.quaternion);
+      car.quaternion.setFromEuler(new THREE.Euler(0, EULER.y, 0, "YXZ"));
+    }
+  };
+
+  const addObstacleInFront = () => {
+    const obstacle = createObstacleMesh(settings.obstacleSize);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(car.quaternion);
+    forward.y = 0;
+
+    if (forward.lengthSq() === 0) {
+      forward.set(0, 0, -1);
+    } else {
+      forward.normalize();
+    }
+
+    const position = car.position
+      .clone()
+      .addScaledVector(forward, settings.obstacleDistance);
+    placeObstacle(obstacle, position);
+  };
+
+  const placeObstacle = (obstacle: THREE.Mesh, position: THREE.Vector3) => {
+    position.y =
+      environment.getSurfaceHeight(position.x, position.z) +
+      settings.obstacleSize * 0.58;
+    obstacle.position.copy(position);
+    obstacle.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    );
+    obstacle.updateMatrixWorld();
+
+    obstacleSlots[nextObstacleIndex]?.removeFromParent();
+    obstacleSlots[nextObstacleIndex]?.geometry.dispose();
+    disposeMaterial(obstacleSlots[nextObstacleIndex]?.material ?? []);
+    obstacleDebugSlots[nextObstacleIndex]?.removeFromParent();
+    obstacleDebugSlots[nextObstacleIndex]?.geometry.dispose();
+    disposeMaterial(obstacleDebugSlots[nextObstacleIndex]?.material ?? []);
+
+    const debugBox = createObstacleDebugBox(settings.obstacleSize);
+    debugBox.position.copy(position);
+    obstacleSlots[nextObstacleIndex] = obstacle;
+    obstacleDebugSlots[nextObstacleIndex] = debugBox;
+    environment.obstacleGroup.add(obstacle);
+    environment.debugGroup.add(debugBox);
+    mujoco.setObstacle(nextObstacleIndex, {
+      position: [-position.z, -position.x, position.y],
+      size: [
+        settings.obstacleSize * 0.72,
+        settings.obstacleSize * 0.72,
+        settings.obstacleSize * 0.58,
+      ],
+    });
+    nextObstacleIndex = (nextObstacleIndex + 1) % OBSTACLE_LIMIT;
+  };
+
+  const clearObstacles = () => {
+    obstacleSlots.forEach((obstacle, index) => {
+      obstacle?.removeFromParent();
+      obstacle?.geometry.dispose();
+      disposeMaterial(obstacle?.material ?? []);
+      obstacleDebugSlots[index]?.removeFromParent();
+      obstacleDebugSlots[index]?.geometry.dispose();
+      disposeMaterial(obstacleDebugSlots[index]?.material ?? []);
+      obstacleSlots[index] = null;
+      obstacleDebugSlots[index] = null;
+      mujoco.setObstacle(index, null);
+    });
+    nextObstacleIndex = 0;
+  };
+
+  const shouldIgnoreKeyboardEvent = (event: KeyboardEvent) => {
+    const target = event.target;
+
+    if (
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement
+    ) {
+      return true;
+    }
+
+    if (!(target instanceof HTMLInputElement)) {
+      return false;
+    }
+
+    return !["button", "checkbox", "radio"].includes(target.type);
   };
 
   const updateKey = (event: KeyboardEvent, active: boolean) => {
     if (!settings.keyboard) return;
 
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement
-    ) {
+    if (shouldIgnoreKeyboardEvent(event)) {
       return;
     }
 
@@ -133,6 +262,23 @@ export async function renderCarScene(
 
   const keyDown = (event: KeyboardEvent) => updateKey(event, true);
   const keyUp = (event: KeyboardEvent) => updateKey(event, false);
+  const pointerDown = (event: PointerEvent) => {
+    if (!settings.clickToAddRock || event.button !== 0) return;
+
+    const target = event.target;
+    if (target !== canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+
+    const [hit] = raycaster.intersectObject(environment.terrain);
+    if (!hit) return;
+
+    event.preventDefault();
+    placeObstacle(createObstacleMesh(settings.obstacleSize), hit.point.clone());
+  };
 
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
@@ -186,6 +332,9 @@ export async function renderCarScene(
     }
 
     orbitControls.update();
+    if (settings.showPhysicsDebug) {
+      debugState.contacts = mujoco.getContactCount();
+    }
     renderer.render(scene, camera);
     animationFrame = window.requestAnimationFrame(animate);
   };
@@ -195,6 +344,7 @@ export async function renderCarScene(
   window.addEventListener("resize", resize);
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
+  canvas.addEventListener("pointerdown", pointerDown);
 
   const controlsFolder = gui?.addFolder("Drive");
   controlsFolder
@@ -206,8 +356,8 @@ export async function renderCarScene(
         updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       }
     });
-  controlsFolder?.add(settings, "drivePower", 0.05, 1, 0.01).name("Drive power");
-  controlsFolder?.add(settings, "turnPower", 0.05, 1, 0.01).name("Turn power");
+  controlsFolder?.add(settings, "drivePower", 0.05, 2, 0.01).name("Drive power");
+  controlsFolder?.add(settings, "turnPower", 0.05, 2, 0.01).name("Turn power");
   controlsFolder?.add(settings, "idleRotation").name("Idle rotation");
   controlsFolder
     ?.add(settings, "showGrid")
@@ -215,8 +365,49 @@ export async function renderCarScene(
     .onChange((visible: boolean) => {
       grid.visible = visible;
     });
+  controlsFolder
+    ?.add(settings, "showVisualCar")
+    .name("Visual car")
+    .onChange((visible: boolean) => {
+      rawCar.visible = visible;
+    });
+  controlsFolder
+    ?.add(settings, "showVisualTerrain")
+    .name("Visual terrain")
+    .onChange((visible: boolean) => {
+      environment.terrain.visible = visible;
+    });
+  controlsFolder
+    ?.add(settings, "stabilizeVisualRoll")
+    .name("Stabilize roll");
   controlsFolder?.add(settings, "resetPose").name("Reset pose");
   controlsFolder?.add(settings, "resetCamera").name("Reset camera");
+
+  const obstacleFolder = gui?.addFolder("Obstacles");
+  obstacleFolder
+    ?.add(settings, "obstacleSize", 0.03, 0.12, 0.005)
+    .name("Rock size");
+  obstacleFolder
+    ?.add(settings, "obstacleDistance", 0.18, 0.58, 0.01)
+    .name("Place distance");
+  obstacleFolder?.add(settings, "clickToAddRock").name("Click to add");
+  obstacleFolder?.add(settings, "addObstacle").name("Add obstacle");
+  obstacleFolder?.add(settings, "clearObstacles").name("Clear obstacles");
+
+  const debugFolder = gui?.addFolder("Debug");
+  debugFolder
+    ?.add(settings, "showPhysicsDebug")
+    .name("Show MJCF model")
+    .onChange((visible: boolean) => {
+      environment.debugGroup.visible = visible;
+      if (!visible) {
+        debugState.contacts = 0;
+      }
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+  debugFolder?.add(debugState, "contacts").name("Contacts").listen();
 
   return {
     dispose: () => {
@@ -224,11 +415,15 @@ export async function renderCarScene(
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
+      canvas.removeEventListener("pointerdown", pointerDown);
       mujoco.setControls(0, 0);
+      clearObstacles();
       updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       audioListener.context.close().catch(() => undefined);
       orbitControls.dispose();
       controlsFolder?.destroy();
+      obstacleFolder?.destroy();
+      debugFolder?.destroy();
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
           object.geometry.dispose();
@@ -246,7 +441,7 @@ function createRenderer(canvas: HTMLCanvasElement) {
     antialias: true,
     alpha: false,
   });
-  renderer.setClearColor(0x14191f, 1);
+  renderer.setClearColor(0x07090d, 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -258,7 +453,7 @@ function createRenderer(canvas: HTMLCanvasElement) {
 
 function createScene() {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x14191f, 0.6, 2.8);
+  scene.fog = new THREE.Fog(0x07090d, 1.4, 4.2);
   return scene;
 }
 
@@ -282,42 +477,4 @@ function createOrbitControls(
   orbitControls.maxDistance = 2.5;
   orbitControls.update();
   return orbitControls;
-}
-
-function addLightingAndGround(scene: THREE.Scene) {
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x303844, 1.55);
-  scene.add(ambient);
-
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
-  keyLight.position.set(0.45, 0.8, 0.55);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1024, 1024);
-  keyLight.shadow.camera.near = 0.05;
-  keyLight.shadow.camera.far = 2.4;
-  keyLight.shadow.camera.left = -0.8;
-  keyLight.shadow.camera.right = 0.8;
-  keyLight.shadow.camera.top = 0.8;
-  keyLight.shadow.camera.bottom = -0.8;
-  scene.add(keyLight);
-
-  const fillLight = new THREE.DirectionalLight(0xb7dcff, 1.1);
-  fillLight.position.set(-0.65, 0.35, -0.45);
-  scene.add(fillLight);
-
-  const grid = new THREE.GridHelper(1.3, 18, 0x365064, 0x253342);
-  scene.add(grid);
-
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.3, 1.3),
-    new THREE.MeshStandardMaterial({
-      color: 0x1b2630,
-      roughness: 0.9,
-      metalness: 0,
-    })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  return grid;
 }

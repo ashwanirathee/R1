@@ -14,6 +14,24 @@ export type MujocoBodyAccessor = ClassHandle & {
   xquat: ArrayLike<number>;
 };
 
+export type MujocoModelBodyAccessor = ClassHandle & {
+  id: number;
+  pos: Float64Array;
+};
+
+export type MujocoGeomAccessor = ClassHandle & {
+  pos: Float64Array;
+  size: Float64Array;
+  rgba: Float32Array;
+};
+
+export type MujocoHfieldAccessor = ClassHandle & {
+  size: Float64Array;
+  nrow: number;
+  ncol: number;
+  data: Float32Array;
+};
+
 export type LoadMujoco = (options?: {
   locateFile?: (path: string) => string;
   print?: (text: string) => void;
@@ -25,6 +43,7 @@ export type LoadMujoco = (options?: {
   MjData: new (model: MujocoModel) => MujocoData;
   mj_forward: (model: MujocoModel, data: MujocoData) => void;
   mj_resetData: (model: MujocoModel, data: MujocoData) => void;
+  mj_setConst: (model: MujocoModel, data: MujocoData) => void;
   mj_step: (model: MujocoModel, data: MujocoData) => void;
 }>;
 
@@ -33,6 +52,7 @@ export type MujocoRuntimeModule = {
 };
 
 export type MujocoSimulation = {
+  xml: string;
   setControls: (forward: number, turn: number) => void;
   step: (deltaSeconds: number) => void;
   reset: () => void;
@@ -40,11 +60,23 @@ export type MujocoSimulation = {
     position: [number, number, number];
     quaternion: [number, number, number, number];
   };
+  getContactCount: () => number;
+  updateTerrainWindow: (centerX: number, centerY: number) => void;
+  setObstacle: (
+    index: number,
+    obstacle: {
+      position: [number, number, number];
+      size: [number, number, number];
+    } | null
+  ) => void;
   dispose: () => void;
 };
 
 export type MujocoModelWithAccessors = MujocoModel & {
   actuator: (name: string) => MujocoNamedAccessor;
+  body: (name: string) => MujocoModelBodyAccessor;
+  geom: (name: string) => MujocoGeomAccessor;
+  hfield: (name: string) => MujocoHfieldAccessor;
   opt?: {
     timestep?: number;
   };
@@ -52,6 +84,8 @@ export type MujocoModelWithAccessors = MujocoModel & {
 
 export type MujocoDataWithAccessors = MujocoData & {
   ctrl: Float64Array;
+  ncon: number;
+  qvel: Float64Array;
   body: (name: string) => MujocoBodyAccessor;
 };
 

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
+const PHYSICS_BODY_BOTTOM_Y = -0.03;
+
 export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync(glbUrl);
@@ -17,7 +19,9 @@ export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   const centeredBounds = new THREE.Box3().setFromObject(group);
   const center = centeredBounds.getCenter(new THREE.Vector3());
   group.position.sub(center);
-  group.position.y = 0.05;
+
+  const alignedBounds = new THREE.Box3().setFromObject(group);
+  group.position.y += PHYSICS_BODY_BOTTOM_Y - alignedBounds.min.y;
 
   group.traverse((object) => {
     if (object instanceof THREE.Mesh) {
