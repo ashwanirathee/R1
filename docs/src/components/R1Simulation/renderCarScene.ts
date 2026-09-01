@@ -3,7 +3,6 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { disposeMaterial, loadCarObject, spinWheels } from "./carModel";
 import {
-  DRIVE_BOUNDS,
   INITIAL_CAMERA_POSITION,
   INITIAL_CAMERA_TARGET,
   WHEEL_SPIN_RATE,
@@ -13,12 +12,22 @@ import {
   loadMotorSound,
   updateMotorSound,
 } from "./motorSound";
-import type { GuiInstance, ThreeSceneHandle } from "./types";
+import type { GuiInstance, MujocoSimulation, ThreeSceneHandle } from "./types";
+
+const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
+  new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(0, 0, -1),
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 1, 0)
+  )
+);
+const THREE_TO_MUJOCO_QUATERNION = MUJOCO_TO_THREE_QUATERNION.clone().invert();
 
 export async function renderCarScene(
   glbUrl: string,
   canvas: HTMLCanvasElement | null,
-  gui: GuiInstance | null
+  gui: GuiInstance | null,
+  mujoco: MujocoSimulation
 ): Promise<ThreeSceneHandle> {
   if (!canvas) {
     throw new Error("Simulation canvas is not mounted.");
@@ -61,17 +70,13 @@ export async function renderCarScene(
   };
   const settings = {
     keyboard: true,
-    driveSpeed: 0.28,
-    steeringRate: 2.8,
+    drivePower: 0.8,
+    turnPower: 0.65,
     idleRotation: false,
     showGrid: true,
-    x: 0,
-    y: 0,
-    heading: 0,
     resetPose: () => {
-      settings.x = 0;
-      settings.y = 0;
-      settings.heading = 0;
+      mujoco.reset();
+      mujoco.setControls(0, 0);
       applyPose();
     },
     resetCamera: () => {
@@ -94,8 +99,12 @@ export async function renderCarScene(
     keyState.forward || keyState.backward || keyState.left || keyState.right;
 
   const applyPose = () => {
-    car.position.set(settings.x, 0.03, settings.y);
-    car.rotation.y = -settings.heading;
+    const { position, quaternion } = mujoco.getCarPose();
+    car.position.set(-position[1], position[2], -position[0]);
+    car.quaternion
+      .set(quaternion[1], quaternion[2], quaternion[3], quaternion[0])
+      .premultiply(MUJOCO_TO_THREE_QUATERNION)
+      .multiply(THREE_TO_MUJOCO_QUATERNION);
   };
 
   const updateKey = (event: KeyboardEvent, active: boolean) => {
@@ -142,34 +151,20 @@ export async function renderCarScene(
 
     if (settings.keyboard) {
       const throttle = Number(keyState.forward) - Number(keyState.backward);
-      const steering = Number(keyState.right) - Number(keyState.left);
-      const isMoving = throttle !== 0 || steering !== 0;
+      const steering = Number(keyState.left) - Number(keyState.right);
+      const idleTurn = throttle === 0 && steering === 0 && settings.idleRotation;
+      const turn = idleTurn ? 0.2 : steering;
+      const isMoving = throttle !== 0 || steering !== 0 || idleTurn;
       const leftWheelInput =
-        throttle !== 0 ? throttle - steering * 0.35 : -steering;
+        throttle !== 0 ? throttle - turn * 0.35 : -turn;
       const rightWheelInput =
-        throttle !== 0 ? throttle + steering * 0.35 : steering;
+        throttle !== 0 ? throttle + turn * 0.35 : turn;
 
-      if (throttle !== 0) {
-        settings.heading +=
-          steering * throttle * deltaSeconds * settings.steeringRate;
-        settings.x +=
-          Math.sin(settings.heading) *
-          throttle *
-          deltaSeconds *
-          settings.driveSpeed;
-        settings.y -=
-          Math.cos(settings.heading) *
-          throttle *
-          deltaSeconds *
-          settings.driveSpeed;
-      } else if (steering !== 0) {
-        settings.heading += steering * deltaSeconds * settings.steeringRate * 0.42;
-      } else if (settings.idleRotation) {
-        settings.heading += 0.006;
-      }
-
-      settings.x = THREE.MathUtils.clamp(settings.x, -DRIVE_BOUNDS, DRIVE_BOUNDS);
-      settings.y = THREE.MathUtils.clamp(settings.y, -DRIVE_BOUNDS, DRIVE_BOUNDS);
+      mujoco.setControls(
+        throttle * settings.drivePower,
+        turn * settings.turnPower
+      );
+      mujoco.step(deltaSeconds);
       spinWheels(driveWheels.left, leftWheelInput * deltaSeconds * WHEEL_SPIN_RATE);
       spinWheels(
         driveWheels.right,
@@ -184,8 +179,9 @@ export async function renderCarScene(
       );
       applyPose();
     } else if (settings.idleRotation) {
-      updateMotorSound(motorSound, motorAudioState, 0, 0, false);
-      settings.heading += 0.006;
+      mujoco.setControls(0, settings.turnPower * 0.2);
+      mujoco.step(deltaSeconds);
+      updateMotorSound(motorSound, motorAudioState, -0.2, 0.2, true);
       applyPose();
     }
 
@@ -210,8 +206,8 @@ export async function renderCarScene(
         updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       }
     });
-  controlsFolder?.add(settings, "driveSpeed", 0.05, 0.8, 0.01).name("Drive speed");
-  controlsFolder?.add(settings, "steeringRate", 0.4, 6, 0.1).name("Steering");
+  controlsFolder?.add(settings, "drivePower", 0.05, 1, 0.01).name("Drive power");
+  controlsFolder?.add(settings, "turnPower", 0.05, 1, 0.01).name("Turn power");
   controlsFolder?.add(settings, "idleRotation").name("Idle rotation");
   controlsFolder
     ?.add(settings, "showGrid")
@@ -228,6 +224,7 @@ export async function renderCarScene(
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
+      mujoco.setControls(0, 0);
       updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       audioListener.context.close().catch(() => undefined);
       orbitControls.dispose();
