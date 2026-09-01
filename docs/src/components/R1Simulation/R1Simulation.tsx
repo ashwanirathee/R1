@@ -6,6 +6,7 @@ import { renderCarScene } from "./renderCarScene";
 import styles from "./R1Simulation.module.css";
 import type { GuiInstance, MujocoSimulation, ThreeSceneHandle } from "./types";
 
+// Mounts the simulation canvas, control panel, MuJoCo runtime, and Three.js scene.
 export function R1Simulation(): ReactNode {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const guiContainerRef = useRef<HTMLDivElement | null>(null);
@@ -19,6 +20,7 @@ export function R1Simulation(): ReactNode {
     let cancelled = false;
     disposedRef.current = false;
 
+    // Lazily creates lil-gui only in the browser, then starts the simulation.
     async function setupGui() {
       const { default: GUI } = await import("lil-gui");
       if (cancelled || !guiContainerRef.current || guiRef.current) return;
@@ -47,6 +49,7 @@ export function R1Simulation(): ReactNode {
     };
   }, []);
 
+  // Loads MuJoCo first, then builds the Three.js scene against that runtime.
   async function loadSimulation() {
     if (loadingRef.current || sceneHandleRef.current) return;
 

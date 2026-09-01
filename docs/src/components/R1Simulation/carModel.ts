@@ -1,8 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-const PHYSICS_BODY_BOTTOM_Y = -0.03;
+const PHYSICS_BODY_BOTTOM_Y = -0.030375;
+const PHYSICS_FOOTPRINT_WIDTH = 0.15;
+const PHYSICS_FOOTPRINT_LENGTH = 0.208125;
 
+// Loads the detailed GLB and aligns it to the simplified MJCF physics proxy.
 export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync(glbUrl);
@@ -10,17 +13,25 @@ export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
 
   const bounds = new THREE.Box3().setFromObject(group);
   const size = bounds.getSize(new THREE.Vector3());
-  const maxAxis = Math.max(size.x, size.y, size.z);
+  // Scale the detailed GLB to the simplified MJCF footprint so the visual car
+  // sits inside the wireframe physics proxy.
+  const footprintScale = Math.min(
+    PHYSICS_FOOTPRINT_WIDTH / size.x,
+    PHYSICS_FOOTPRINT_LENGTH / size.z
+  );
 
-  if (maxAxis > 0) {
-    group.scale.multiplyScalar(0.26 / maxAxis);
+  if (Number.isFinite(footprintScale) && footprintScale > 0) {
+    group.scale.multiplyScalar(footprintScale);
   }
 
   const centeredBounds = new THREE.Box3().setFromObject(group);
   const center = centeredBounds.getCenter(new THREE.Vector3());
-  group.position.sub(center);
+  // Only center horizontally; vertical alignment is handled from the bottom.
+  group.position.x -= center.x;
+  group.position.z -= center.z;
 
   const alignedBounds = new THREE.Box3().setFromObject(group);
+  // Align the GLB bottom with the MJCF wheel bottom in the car body's local frame.
   group.position.y += PHYSICS_BODY_BOTTOM_Y - alignedBounds.min.y;
 
   group.traverse((object) => {
@@ -33,11 +44,13 @@ export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   return group;
 }
 
+// Spins the visual wheel meshes; MuJoCo wheel motion is handled separately.
 export function spinWheels(wheels: THREE.Object3D[], radians: number) {
   if (radians === 0) return;
   wheels.forEach((wheel) => wheel.rotateX(-radians));
 }
 
+// Disposes one material or an array of materials during scene teardown.
 export function disposeMaterial(material: THREE.Material | THREE.Material[]) {
   const materials = Array.isArray(material) ? material : [material];
   materials.forEach((item) => item.dispose());

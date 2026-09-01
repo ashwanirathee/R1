@@ -31,6 +31,8 @@ const MUJOCO_TO_THREE_VECTOR = new THREE.Matrix4().makeBasis(
 );
 
 export function parseMujocoHfield(xml: string): PhysicsHfield {
+  // Parse the hfield directly from car.xml so the rendered terrain and the
+  // MuJoCo collision terrain stay tied to the same data source.
   const hfieldTag = xml.match(/<hfield\b[^>]*name="lunar_hfield"[^>]*>/)?.[0];
   if (!hfieldTag) {
     throw new Error("Missing lunar_hfield in car.xml.");
@@ -61,6 +63,7 @@ export function parseMujocoHfield(xml: string): PhysicsHfield {
   };
 }
 
+// Adds terrain, lighting, debug groups, obstacle groups, and procedural sky.
 export function addMoonEnvironment(
   scene: THREE.Scene,
   hfield: PhysicsHfield
@@ -92,8 +95,11 @@ export function addMoonEnvironment(
     roughness: 1,
     metalness: 0,
   });
+  // Shared height lookup used by terrain, debug overlays, and rock placement.
   const getSurfaceHeight = (x: number, z: number) =>
     getHfieldSurfaceHeight(hfield, x, z);
+  // The terrain mesh is dense for nicer shading, but every vertex height comes
+  // from bilinear sampling of the same 17x17 MuJoCo hfield.
   const groundGeometry = createUndulatingTerrainGeometry(
     hfield,
     getSurfaceHeight
@@ -103,8 +109,8 @@ export function addMoonEnvironment(
   ground.receiveShadow = true;
   scene.add(ground);
 
-  addCraters(scene);
-  addRocks(scene, getSurfaceHeight);
+  // Keep the base environment visually flat while validating the MJCF car.
+  // User-placed rocks still use real MuJoCo obstacle bodies.
   addProceduralSky(scene);
 
   const grid = new THREE.GridHelper(1.4, 20, 0x8a877f, 0x55524d);
@@ -132,6 +138,7 @@ export function addMoonEnvironment(
   };
 }
 
+// Creates the wireframe box that shows the MuJoCo obstacle collision bounds.
 export function createObstacleDebugBox(size: number): THREE.LineSegments {
   const geometry = new THREE.EdgesGeometry(
     new THREE.BoxGeometry(size * 1.44, size * 1.44, size * 1.16)
@@ -148,6 +155,7 @@ export function createObstacleDebugBox(size: number): THREE.LineSegments {
   return box;
 }
 
+// Creates a wireframe copy of the MJCF car geoms for in-scene physics debugging.
 export function createMujocoCarModelDebug(): THREE.Group {
   const group = new THREE.Group();
   const material = new THREE.MeshBasicMaterial({
@@ -158,17 +166,18 @@ export function createMujocoCarModelDebug(): THREE.Group {
     depthTest: false,
   });
   const chassis = new THREE.Mesh(
-    new THREE.BoxGeometry(0.15, 0.07, 0.25),
+    new THREE.BoxGeometry(0.15, 0.084, 0.208125),
     material
   );
-  chassis.position.copy(mujocoVectorToThree(0, 0, 0.04));
+  // Matches the chassis box in car.xml after MuJoCo-to-Three axis conversion.
+  chassis.position.copy(mujocoVectorToThree(-0.0028125, 0, 0.047));
   chassis.renderOrder = 10;
   group.add(chassis);
 
   const wheelGeometry = new THREE.CylinderGeometry(
-    0.03375,
-    0.03375,
-    0.0225,
+    0.030375,
+    0.030375,
+    0.02025,
     24
   );
   wheelGeometry.applyQuaternion(
@@ -178,10 +187,10 @@ export function createMujocoCarModelDebug(): THREE.Group {
     )
   );
   [
-    [0.055, 0.075, 0],
-    [0.055, -0.075, 0],
-    [-0.055, 0.075, 0],
-    [-0.055, -0.075, 0],
+    [0.04455, 0.0675, 0],
+    [0.04455, -0.0675, 0],
+    [-0.0495, 0.0675, 0],
+    [-0.0495, -0.0675, 0],
   ].forEach(([x, y, z]) => {
     const wheel = new THREE.Mesh(wheelGeometry.clone(), material);
     wheel.position.copy(mujocoVectorToThree(x, y, z));
@@ -197,6 +206,7 @@ export function getHfieldSurfaceHeight(
   x: number,
   z: number
 ) {
+  // Convert Three.js world x/z back into MuJoCo hfield row/column space.
   const mujocoX = -z;
   const mujocoY = -x;
   const row =
@@ -209,6 +219,7 @@ export function getHfieldSurfaceHeight(
   return sampleHfieldHeight(hfield, row, column) * hfield.height;
 }
 
+// Creates the visual rock mesh used when placing obstacle bodies.
 export function createObstacleMesh(size: number): THREE.Mesh {
   const geometry = new THREE.DodecahedronGeometry(size, 0);
   const material = new THREE.MeshStandardMaterial({
@@ -225,6 +236,7 @@ export function createObstacleMesh(size: number): THREE.Mesh {
   return mesh;
 }
 
+// Adds decorative crater meshes; disabled while the flat-terrain baseline is active.
 function addCraters(scene: THREE.Scene) {
   const craterMaterial = new THREE.MeshStandardMaterial({
     color: CRATER_COLOR,
@@ -259,6 +271,7 @@ function addCraters(scene: THREE.Scene) {
   });
 }
 
+// Adds decorative static rocks; user-placed rocks are handled by obstacle bodies.
 function addRocks(
   scene: THREE.Scene,
   getSurfaceHeight: (x: number, z: number) => number
@@ -290,6 +303,7 @@ function addRocks(
   });
 }
 
+// Builds the visible terrain mesh from the parsed MuJoCo hfield samples.
 function createUndulatingTerrainGeometry(
   hfield: PhysicsHfield,
   getSurfaceHeight: (x: number, z: number) => number
@@ -314,14 +328,18 @@ function createUndulatingTerrainGeometry(
   return geometry;
 }
 
+// Converts a local MuJoCo vector into the Three.js scene axis convention.
 function mujocoVectorToThree(x: number, y: number, z: number) {
   return new THREE.Vector3(x, y, z).applyMatrix4(MUJOCO_TO_THREE_VECTOR);
 }
 
+// Creates the line/point overlay for inspecting MuJoCo hfield sample locations.
 function createPhysicsHfieldDebug(
   hfield: PhysicsHfield,
   getSurfaceHeight: (x: number, z: number) => number
 ) {
+  // Draw MuJoCo's actual hfield sample lattice. Lines show cell edges and
+  // points mark the raw hfield samples used for collision.
   const group = new THREE.Group();
   const vertices: number[] = [];
   const pointVertices: number[] = [];
@@ -393,6 +411,7 @@ function createPhysicsHfieldDebug(
   return group;
 }
 
+// Bilinearly samples hfield elevation data at fractional row/column positions.
 function sampleHfieldHeight(
   hfield: PhysicsHfield,
   row: number,
@@ -416,6 +435,7 @@ function sampleHfieldHeight(
   return THREE.MathUtils.lerp(h0, h1, rowT);
 }
 
+// Reads a required XML attribute from the parsed hfield tag.
 function readXmlAttribute(tag: string, name: string) {
   const value = tag.match(new RegExp(`\\b${name}="([^"]+)"`))?.[1];
   if (!value) {
@@ -425,6 +445,7 @@ function readXmlAttribute(tag: string, name: string) {
   return value;
 }
 
+// Reads a whitespace-separated numeric XML attribute such as size or elevation.
 function readNumberListAttribute(tag: string, name: string) {
   return readXmlAttribute(tag, name)
     .trim()
@@ -432,12 +453,14 @@ function readNumberListAttribute(tag: string, name: string) {
     .map((value) => Number.parseFloat(value));
 }
 
+// Adds all generated sky elements: stars, Earth, and the horizon glow.
 function addProceduralSky(scene: THREE.Scene) {
   addStars(scene);
   addEarth(scene);
   addHorizonGlow(scene);
 }
 
+// Builds the procedural Earth sphere and cloud/atmosphere layers.
 function addEarth(scene: THREE.Scene) {
   const earthGroup = new THREE.Group();
   earthGroup.name = "procedural-earth";
@@ -482,6 +505,7 @@ function addEarth(scene: THREE.Scene) {
   scene.add(earthGroup);
 }
 
+// Draws a simple procedural Earth texture into a canvas.
 function createEarthTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -534,6 +558,7 @@ function createEarthTexture() {
   return texture;
 }
 
+// Draws a transparent procedural cloud texture into a canvas.
 function createCloudTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -565,6 +590,7 @@ function createCloudTexture() {
   return texture;
 }
 
+// Adds a subtle ring near the ground plane to separate horizon from space.
 function addHorizonGlow(scene: THREE.Scene) {
   const glow = new THREE.Mesh(
     new THREE.RingGeometry(1.05, 1.42, 96),
@@ -582,6 +608,7 @@ function addHorizonGlow(scene: THREE.Scene) {
   scene.add(glow);
 }
 
+// Creates procedural star points around the simulation scene.
 function addStars(scene: THREE.Scene) {
   const vertices: number[] = [];
   const colors: number[] = [];

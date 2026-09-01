@@ -2,18 +2,20 @@
   <compiler autolimits="true"/>
 
   <asset>
+    <!-- Flat hfield for the current baseline: MuJoCo sees a level lunar plane. -->
     <texture name="lunar" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .2 .2" rgb2=".28 .28 .26"/>
     <material name="lunar" texture="lunar" texrepeat="3 3" texuniform="true" reflectance=".05"/>
     <material name="moon_rock" rgba=".36 .35 .32 1" reflectance=".08"/>
-    <hfield name="lunar_hfield" nrow="17" ncol="17" size="1.6 1.6 .07 .02"
-      elevation="0.721 0.650 0.499 0.518 0.500 0.673 0.529 0.298 0.263 0.221 0.417 0.344 0.184 0.235 0.280 0.564 0.577 0.640 0.589 0.468 0.199 0.312 0.369 0.349 0.294 0.096 0.288 0.449 0.518 0.537 0.364 0.540 0.674 0.684 0.352 0.458 0.229 0.190 0.177 0.343 0.559 0.421 0.432 0.441 0.590 0.782 0.585 0.501 0.409 0.454 0.583 0.343 0.399 0.504 0.368 0.357 0.603 0.652 0.721 0.521 0.401 0.547 0.512 0.517 0.279 0.128 0.291 0.314 0.413 0.700 0.696 0.547 0.510 0.437 0.628 0.554 0.336 0.254 0.162 0.377 0.380 0.242 0.250 0.242 0.536 0.528 0.590 0.592 0.513 0.206 0.255 0.319 0.356 0.354 0.127 0.254 0.415 0.537 0.606 0.402 0.505 0.627 0.233 0.284 0.448 0.280 0.229 0.162 0.295 0.563 0.484 0.454 0.432 0.536 0.769 0.628 0.534 0.384 0.382 0.110 0.298 0.383 0.551 0.437 0.362 0.384 0.626 0.751 0.573 0.390 0.484 0.465 0.530 0.326 0.123 0.238 0.412 0.378 0.660 0.720 0.599 0.526 0.323 0.565 0.557 0.376 0.269 0.116 0.321 0.394 0.301 0.290 0.219 0.463 0.490 0.529 0.569 0.551 0.234 0.217 0.261 0.341 0.407 0.178 0.241 0.376 0.531 0.664 0.458 0.490 0.415 0.218 0.217 0.416 0.316 0.282 0.172 0.249 0.545 0.531 0.544 0.446 0.485 0.733 0.653 0.577 0.382 0.277 0.128 0.263 0.350 0.577 0.510 0.390 0.524 0.582 0.758 0.398 0.174 0.433 0.403 0.521 0.375 0.143 0.467 0.463 0.361 0.609 0.718 0.644 0.496 0.352 0.494 0.536 0.408 0.304 0.092 0.261 0.384 0.351 0.348 0.763 0.512 0.474 0.468 0.524 0.575 0.276 0.204 0.207 0.304 0.444 0.242 0.253 0.341 0.504 0.704 0.522 0.529 0.455 0.227 0.160 0.366 0.332 0.340 0.206 0.216 0.510 0.555 0.607 0.484 0.446 0.681 0.654 0.618 0.419 0.334 0.169 0.246 0.308 0.578 0.576 0.439 0.509 0.530 0.739 0.671 0.433 0.402 0.335 0.488 0.414 0.474 0.515 0.528 0.368 0.557 0.693 0.672 0.607 0.343 0.424 0.492 0.425 0.350 0.094 0.206 0.354 0.383"/>
+    <hfield name="lunar_hfield" nrow="2" ncol="2" size="1.6 1.6 .07 .02"
+      elevation="0 0 0 0"/>
   </asset>
 
   <default>
     <joint damping=".025" actuatorfrcrange="-4 4"/>
-    <geom condim="3" friction="1.2 .08 .02"/>
+    <geom condim="3" friction="1.2 .08 .02" solref=".004 1" solimp=".95 .99 .001"/>
     <default class="wheel">
-      <geom type="cylinder" size=".03375 .01125" rgba=".5 .5 1 1"/>
+      <!-- Wheel size is radius, half-width. Friction keeps forward grip high while allowing skid-turning. -->
+      <geom type="cylinder" size=".030375 .010125" rgba=".5 .5 1 1" condim="4" friction="1.4 .05 .01" priority="1" solref=".002 1" solimp=".97 .995 .001"/>
     </default>
     <default class="decor">
       <site type="box" rgba=".5 1 .5 1"/>
@@ -22,6 +24,7 @@
 
   <worldbody>
     <geom name="lunar ground" type="hfield" hfield="lunar_hfield" material="lunar"/>
+    <!-- Obstacle bodies are parked off-field and moved into place from TypeScript when rocks are added. -->
     <body name="obstacle_body_0" pos="4 4 .06">
       <geom name="obstacle_0" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
     </body>
@@ -37,30 +40,33 @@
     <body name="obstacle_body_4" pos="4.8 4 .06">
       <geom name="obstacle_4" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
     </body>
-    <body name="car" pos="0 0 .13">
+    <!-- Car body z is chosen so the wheels start just above the flat hfield. -->
+    <body name="car" pos="0 0 .035">
       <freejoint/>
       <light name="top light" pos="0 0 2" mode="trackcom" diffuse=".4 .4 .4"/>
-      <geom name="chassis" type="box" pos="0 0 .04" size=".125 .075 .035"/>
-      <light name="front light" pos=".1 0 .02" dir="2 0 -1" diffuse="1 1 1"/>
-      <body name="front left wheel" pos=".055 .075 0" zaxis="0 1 0">
+      <!-- Chassis is a simplified collision/debug cuboid. Pos is its local center; size is half-extents. -->
+      <geom name="chassis" type="box" pos="-.0028125 0 .047" size=".1040625 .075 .042"/>
+      <light name="front light" pos=".09 0 .02" dir="2 0 -1" diffuse="1 1 1"/>
+      <!-- Wheels use MuJoCo X for front/back and Y for left/right spacing. -->
+      <body name="front left wheel" pos=".04455 .0675 0" zaxis="0 1 0">
         <joint name="front_left"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
         <site class="decor" size=".025 .006 .012"/>
       </body>
-      <body name="front right wheel" pos=".055 -.075 0" zaxis="0 1 0">
+      <body name="front right wheel" pos=".04455 -.0675 0" zaxis="0 1 0">
         <joint name="front_right"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
         <site class="decor" size=".025 .006 .012"/>
       </body>
-      <body name="rear left wheel" pos="-.055 .075 0" zaxis="0 1 0">
+      <body name="rear left wheel" pos="-.0495 .0675 0" zaxis="0 1 0">
         <joint name="rear_left"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
         <site class="decor" size=".025 .006 .012"/>
       </body>
-      <body name="rear right wheel" pos="-.055 -.075 0" zaxis="0 1 0">
+      <body name="rear right wheel" pos="-.0495 -.0675 0" zaxis="0 1 0">
         <joint name="rear_right"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
@@ -70,6 +76,7 @@
   </worldbody>
 
   <tendon>
+    <!-- Tendons combine four wheel joints into simple forward and differential-turn controls. -->
     <fixed name="forward">
       <joint joint="front_left" coef=".25"/>
       <joint joint="front_right" coef=".25"/>

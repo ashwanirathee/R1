@@ -25,13 +25,6 @@ export type MujocoGeomAccessor = ClassHandle & {
   rgba: Float32Array;
 };
 
-export type MujocoHfieldAccessor = ClassHandle & {
-  size: Float64Array;
-  nrow: number;
-  ncol: number;
-  data: Float32Array;
-};
-
 export type LoadMujoco = (options?: {
   locateFile?: (path: string) => string;
   print?: (text: string) => void;
@@ -61,7 +54,6 @@ export type MujocoSimulation = {
     quaternion: [number, number, number, number];
   };
   getContactCount: () => number;
-  updateTerrainWindow: (centerX: number, centerY: number) => void;
   setObstacle: (
     index: number,
     obstacle: {
@@ -76,7 +68,6 @@ export type MujocoModelWithAccessors = MujocoModel & {
   actuator: (name: string) => MujocoNamedAccessor;
   body: (name: string) => MujocoModelBodyAccessor;
   geom: (name: string) => MujocoGeomAccessor;
-  hfield: (name: string) => MujocoHfieldAccessor;
   opt?: {
     timestep?: number;
   };

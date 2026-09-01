@@ -16,6 +16,8 @@ const OBSTACLE_COUNT = 5;
 const HIDDEN_OBSTACLE_POSITION: [number, number, number] = [4, 4, 0.06];
 
 async function importRuntimeModule(url: string): Promise<MujocoRuntimeModule> {
+  // MuJoCo is served as a browser ESM bundle from /static, so keep the import
+  // dynamic and URL-based instead of bundling it into the Docusaurus build.
   const runtimeImport = new Function("url", "return import(url)") as (
     url: string
   ) => Promise<MujocoRuntimeModule>;
@@ -23,6 +25,7 @@ async function importRuntimeModule(url: string): Promise<MujocoRuntimeModule> {
   return runtimeImport(url);
 }
 
+// Creates the MuJoCo model/data pair and exposes a small simulation API to Three.js.
 export async function createMujocoSimulation(): Promise<MujocoSimulation> {
   const xmlResponse = await fetch(CAR_XML_URL);
 
@@ -32,6 +35,8 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
 
   const xml = await xmlResponse.text();
   const { default: loadMujoco } = await importRuntimeModule(MUJOCO_MODULE_URL);
+  // The JS loader asks for mujoco.wasm separately; route that request to the
+  // static asset URL so browser and build paths stay predictable.
   const mujoco = await loadMujoco({
     locateFile: (path) =>
       path.endsWith(".wasm") ? MUJOCO_WASM_URL : `/mujoco/${path}`,
@@ -50,6 +55,8 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
     model.geom(`obstacle_${index}`)
   );
 
+  // The obstacle bodies exist in the MJCF from startup. Moving/resizing them is
+  // cheaper and more reliable than rebuilding the MuJoCo model for each click.
   forwardActuator.delete?.();
   turnActuator.delete?.();
   obstacleBodies.forEach((body, index) => {
@@ -68,6 +75,8 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
   return {
     xml,
     setControls: (forward, turn) => {
+      // Actuators map high-level drive/turn controls onto all wheel joints via
+      // fixed tendons declared in car.xml.
       data.ctrl[forwardActuatorId] = forward;
       data.ctrl[turnActuatorId] = turn;
     },
@@ -133,11 +142,14 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
 }
 
 function dampFreeJointAngularVelocity(qvel: Float64Array) {
+  // The rover has a freejoint on bumpy hfield terrain. A little angular damping
+  // keeps numerical roll/pitch spikes from dominating the visual motion.
   qvel[3] *= 0.88;
   qvel[4] *= 0.88;
   qvel[5] *= 0.94;
 }
 
+// Moves a predeclared MJCF obstacle body to either an active or hidden position.
 function moveObstacleBody(
   body: MujocoModelBodyAccessor,
   position: [number, number, number]
@@ -147,6 +159,7 @@ function moveObstacleBody(
   body.pos[2] = position[2];
 }
 
+// Updates the MuJoCo obstacle box half-extents to match the visual rock size.
 function resizeObstacleGeom(
   geom: MujocoGeomAccessor,
   size: [number, number, number]

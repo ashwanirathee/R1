@@ -7,6 +7,7 @@ type MotorAudioState = {
   playbackRate: number;
 };
 
+// Creates mutable playback state for smoothing motor audio changes over time.
 export function createMotorAudioState(): MotorAudioState {
   return {
     volume: 0,
@@ -14,6 +15,7 @@ export function createMotorAudioState(): MotorAudioState {
   };
 }
 
+// Loads the optional drive audio buffer and attaches it to the active listener.
 export async function loadMotorSound(
   listener: THREE.AudioListener
 ): Promise<THREE.PositionalAudio | null> {
@@ -33,6 +35,7 @@ export async function loadMotorSound(
   }
 }
 
+// Updates playback, pitch, and volume based on current wheel drive input.
 export function updateMotorSound(
   motorSound: THREE.PositionalAudio | null,
   state: MotorAudioState,

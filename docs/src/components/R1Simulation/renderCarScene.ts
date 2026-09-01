@@ -17,11 +17,13 @@ import {
   createMujocoCarModelDebug,
   createObstacleDebugBox,
   createObstacleMesh,
+  parseMujocoHfield,
 } from "./moonEnvironment";
-import { parseMujocoHfield } from "./moonTerrain";
 import type { GuiInstance, MujocoSimulation, ThreeSceneHandle } from "./types";
 
 const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
+  // MuJoCo uses X-forward/Y-left/Z-up; Three.js scene uses X-right/Y-up/Z-back.
+  // Keep pose conversion centralized so the GLB and MJCF debug model agree.
   new THREE.Matrix4().makeBasis(
     new THREE.Vector3(0, 0, -1),
     new THREE.Vector3(-1, 0, 0),
@@ -30,8 +32,10 @@ const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
 );
 const THREE_TO_MUJOCO_QUATERNION = MUJOCO_TO_THREE_QUATERNION.clone().invert();
 const OBSTACLE_LIMIT = 5;
+const OBSTACLE_BOUNDS = 0.68;
 const EULER = new THREE.Euler(0, 0, 0, "YXZ");
 
+// Builds and runs the Three.js render loop that mirrors the MuJoCo simulation.
 export async function renderCarScene(
   glbUrl: string,
   canvas: HTMLCanvasElement | null,
@@ -51,11 +55,14 @@ export async function renderCarScene(
   camera.add(audioListener);
 
   const orbitControls = createOrbitControls(camera, renderer.domElement);
+  // Build the visible terrain from the exact hfield encoded in the loaded MJCF.
   const environment = addMoonEnvironment(scene, parseMujocoHfield(mujoco.xml));
   const grid = environment.grid;
   const rawCar = await loadCarObject(glbUrl);
   const car = new THREE.Group();
   car.add(rawCar);
+  // This wireframe is the simplified MJCF body, not the detailed GLB. It is
+  // useful for checking what MuJoCo is actually simulating.
   const mujocoCarDebug = createMujocoCarModelDebug();
   environment.debugGroup.add(mujocoCarDebug);
 
@@ -104,20 +111,24 @@ export async function renderCarScene(
     showVisualTerrain: true,
     showPhysicsDebug: false,
     stabilizeVisualRoll: true,
-    clickToAddRock: true,
+    clickToAddRock: false,
     obstacleSize: 0.065,
     obstacleDistance: 0.34,
+    // GUI action: place a rock ahead of the rover.
     addObstacle: () => {
       addObstacleInFront();
     },
+    // GUI action: clear all active rock obstacles.
     clearObstacles: () => {
       clearObstacles();
     },
+    // GUI action: reset MuJoCo state and immediately mirror the fresh pose.
     resetPose: () => {
       mujoco.reset();
       mujoco.setControls(0, 0);
       applyPose();
     },
+    // GUI action: restore the default orbit-camera view.
     resetCamera: () => {
       camera.position.copy(INITIAL_CAMERA_POSITION);
       orbitControls.target.copy(INITIAL_CAMERA_TARGET);
@@ -127,6 +138,7 @@ export async function renderCarScene(
   let lastFrameTime = performance.now();
   let animationFrame = 0;
 
+  // Clears remembered keyboard state when controls are disabled or reset.
   const clearKeys = () => {
     keyState.forward = false;
     keyState.backward = false;
@@ -134,14 +146,16 @@ export async function renderCarScene(
     keyState.right = false;
   };
 
+  // Reports whether any drive key is currently active for audio gating.
   const isDriveInputActive = () =>
     keyState.forward || keyState.backward || keyState.left || keyState.right;
 
+  // Copies the current MuJoCo car pose onto both the GLB and MJCF debug model.
   const applyPose = () => {
     const { position, quaternion } = mujoco.getCarPose();
+    // Convert MuJoCo world position into the Three.js world before rendering.
     const x = -position[1];
     const z = -position[0];
-    environment.updateTerrainWindow(x, z);
     car.position.set(x, position[2], z);
     car.quaternion
       .set(quaternion[1], quaternion[2], quaternion[3], quaternion[0])
@@ -156,6 +170,7 @@ export async function renderCarScene(
     }
   };
 
+  // Places a new obstacle a short distance ahead of the current car heading.
   const addObstacleInFront = () => {
     const obstacle = createObstacleMesh(settings.obstacleSize);
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(car.quaternion);
@@ -173,7 +188,12 @@ export async function renderCarScene(
     placeObstacle(obstacle, position);
   };
 
+  // Adds or replaces one visual rock and syncs the matching MuJoCo obstacle.
   const placeObstacle = (obstacle: THREE.Mesh, position: THREE.Vector3) => {
+    // Clamp to the finite hfield patch; MuJoCo collision only exists inside
+    // the current lunar_hfield bounds.
+    position.x = THREE.MathUtils.clamp(position.x, -OBSTACLE_BOUNDS, OBSTACLE_BOUNDS);
+    position.z = THREE.MathUtils.clamp(position.z, -OBSTACLE_BOUNDS, OBSTACLE_BOUNDS);
     position.y =
       environment.getSurfaceHeight(position.x, position.z) +
       settings.obstacleSize * 0.58;
@@ -198,6 +218,7 @@ export async function renderCarScene(
     obstacleDebugSlots[nextObstacleIndex] = debugBox;
     environment.obstacleGroup.add(obstacle);
     environment.debugGroup.add(debugBox);
+    // Mirror the visual obstacle into one of the predeclared MuJoCo bodies.
     mujoco.setObstacle(nextObstacleIndex, {
       position: [-position.z, -position.x, position.y],
       size: [
@@ -209,6 +230,7 @@ export async function renderCarScene(
     nextObstacleIndex = (nextObstacleIndex + 1) % OBSTACLE_LIMIT;
   };
 
+  // Removes all visual rocks and parks their MuJoCo obstacle bodies off-field.
   const clearObstacles = () => {
     obstacleSlots.forEach((obstacle, index) => {
       obstacle?.removeFromParent();
@@ -224,6 +246,7 @@ export async function renderCarScene(
     nextObstacleIndex = 0;
   };
 
+  // Avoids hijacking keyboard input while the user is editing GUI fields.
   const shouldIgnoreKeyboardEvent = (event: KeyboardEvent) => {
     const target = event.target;
 
@@ -241,6 +264,7 @@ export async function renderCarScene(
     return !["button", "checkbox", "radio"].includes(target.type);
   };
 
+  // Converts browser keydown/keyup events into persistent WASD drive state.
   const updateKey = (event: KeyboardEvent, active: boolean) => {
     if (!settings.keyboard) return;
 
@@ -253,6 +277,8 @@ export async function renderCarScene(
 
     event.preventDefault();
 
+    // Key naming follows the UI convention: W/S drive, A/D rotate/steer.
+    // The actuator sign mapping below determines clockwise vs anticlockwise.
     if (key === "w") keyState.forward = active;
     if (key === "s") keyState.backward = active;
     if (key === "a") keyState.left = active;
@@ -260,8 +286,11 @@ export async function renderCarScene(
     updateMotorSound(motorSound, motorAudioState, 0, 0, isDriveInputActive());
   };
 
+  // Marks a drive key as pressed.
   const keyDown = (event: KeyboardEvent) => updateKey(event, true);
+  // Marks a drive key as released.
   const keyUp = (event: KeyboardEvent) => updateKey(event, false);
+  // Raycasts into the terrain to place a rock where the user clicks.
   const pointerDown = (event: PointerEvent) => {
     if (!settings.clickToAddRock || event.button !== 0) return;
 
@@ -280,6 +309,7 @@ export async function renderCarScene(
     placeObstacle(createObstacleMesh(settings.obstacleSize), hit.point.clone());
   };
 
+  // Keeps renderer and camera projection matched to the canvas size.
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(1, Math.floor(rect.width));
@@ -290,12 +320,15 @@ export async function renderCarScene(
     camera.updateProjectionMatrix();
   };
 
+  // Advances MuJoCo, updates visual-only effects, and renders each frame.
   const animate = () => {
     const frameTime = performance.now();
     const deltaSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.05);
     lastFrameTime = frameTime;
 
     if (settings.keyboard) {
+      // WASD controls are expressed as throttle + differential turn, then
+      // passed to MuJoCo actuators. Wheel mesh spin is visual only.
       const throttle = Number(keyState.forward) - Number(keyState.backward);
       const steering = Number(keyState.left) - Number(keyState.right);
       const idleTurn = throttle === 0 && steering === 0 && settings.idleRotation;
@@ -435,6 +468,7 @@ export async function renderCarScene(
   };
 }
 
+// Creates the WebGL renderer with tone mapping and shadows enabled.
 function createRenderer(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -451,12 +485,14 @@ function createRenderer(canvas: HTMLCanvasElement) {
   return renderer;
 }
 
+// Creates the base Three.js scene and fog used by the moon environment.
 function createScene() {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x07090d, 1.4, 4.2);
   return scene;
 }
 
+// Creates the perspective camera at the default simulation viewpoint.
 function createCamera() {
   const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 10);
   camera.position.copy(INITIAL_CAMERA_POSITION);
@@ -464,6 +500,7 @@ function createCamera() {
   return camera;
 }
 
+// Creates orbit controls around the rover-focused starting target.
 function createOrbitControls(
   camera: THREE.PerspectiveCamera,
   element: HTMLElement
