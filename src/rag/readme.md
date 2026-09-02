@@ -1,11 +1,11 @@
-# Medha
+# RAG
 
-Medha is a FastAPI service that provisions per-user collections inside a running ChromaDB instance. It exposes endpoints for user signup, document ingestion, folder-based bulk indexing, and retrieval over the stored chunks.
+RAG is a FastAPI service that provisions per-user collections inside a running ChromaDB instance. It exposes endpoints for user signup, bearer-token creation, document ingestion, folder-based bulk indexing, and retrieval over the stored chunks.
 
 ## What Ships In This Repo
 
-- `run_medha.py`: FastAPI application that wires the `v1` router.
-- `run_medha.sh`: helper wrapper around `uv run uvicorn run_medha:app` with sensible host/port defaults.
+- `run_rag.py`: FastAPI application that wires the `v1` router.
+- `run_rag.sh`: helper wrapper around `uv run uvicorn run_rag:app` with sensible host/port defaults.
 - `src/routers/v1.py`: request handlers for signup, ingestion, querying, and health.
 - `src/services/chroma.py`: thin client around `chromadb.HttpClient` (expects a Chroma server on `localhost:8000`).
 - `src/services/ingest.py`: folder ingestion utilities (PDF/Text/Markdown parsing, fixed-size chunking, and metadata generation).
@@ -24,7 +24,7 @@ The code now depends on the Chroma HTTP API for persistence.
 Set up Python dependencies:
 
 ```bash
-cd /Users/ash/Documents/work/medha
+cd ./r1/rag
 uv sync
 ```
 
@@ -41,13 +41,13 @@ Docker-based Chroma deployments work too as long as the FastAPI process can reac
 Launch the server with `uvicorn`:
 
 ```bash
-uv run uvicorn run_medha:app --host 127.0.0.1 --port 8051 --reload
+uv run uvicorn run_rag:app --host 127.0.0.1 --port 8051 --reload
 ```
 
 Or rely on the helper script (defaults to `0.0.0.0:8051` so you can hit it from other devices on the network):
 
 ```bash
-./run_medha.sh [--host 0.0.0.0] [--port 8051]
+./run_rag.sh [--host 0.0.0.0] [--port 8051]
 ```
 
 Hit `GET /health` to verify readiness.
@@ -57,26 +57,56 @@ Hit `GET /health` to verify readiness.
 All routes live under `src/routers/v1.py`:
 
 - `GET /health` — basic readiness probe.
-- `POST /v1/signup` — register a user. Creates a Chroma collection named after the generated bearer token and stores the record. Body:
+- `POST /v1/signup` — register a user. Creates a Chroma collection, creates the default user folders (`secret`, `private`, `private_safe`, `public`), and stores the user record. Body:
+
+  ```json
+  {
+    "username": "demo",
+    "password": "plaintext-only-for-local-testing"
+  }
+  ```
+
+  Response:
+
+  ```json
+  {
+    "status": "success"
+  }
+  ```
+- `POST /v1/create_token` — issue a bearer token for an existing user and requested scopes. Body:
+
   ```json
   {
     "username": "demo",
     "password": "plaintext-only-for-local-testing",
-    "scopes": ["user:query"]
+    "scopes": ["public"],
+    "label": "default"
   }
   ```
 
   Response includes `bearer_token`.
-- `POST /v1/add_documents` — manually add raw text chunks to the caller's collection.
+- `POST /v1/query` — run similarity search with the provided `query`. Uses the caller's token scopes unless `requested_scopes` is provided, then returns the matching Chroma results.
+
   ```json
   {
-    "token": "bearer token from signup",
-    "documents": ["first chunk", "second chunk"]
+    "token": "bearer token from /v1/create_token",
+    "query": "what context is available?",
+    "requested_scopes": ["public"]
   }
   ```
-- `POST /v1/query_documents` — run similarity search with the provided `query`. Uses the caller's collection and returns whatever Chroma returns (documents, metadatas, ids).
-- `POST /v1/ingest_documents` — recursively walk a folder, chunk supported files (`.pdf`, `.txt`, `.md`), and upsert every chunk plus metadata into the caller's collection. Body contains `token` and `folder_path`.
-- `POST /v1/collections` — fetch stored documents/metadatas for a collection (requires the token belonging to that collection).
+- `POST /v1/ingest_refresh` — re-index the authenticated user's managed folder into their Chroma collection. The route requires `token`; the current request schema also includes `folder_path`, but the handler uses the stored user folder path.
+
+  ```json
+  {
+    "token": "bearer token from /v1/create_token",
+    "folder_path": "ignored-by-current-handler"
+  }
+  ```
+- `POST /v1/ingest_repository` — recursively index a repository path into the caller's collection, scoped to `scope` (defaults to `public`). Pass `repository_path` only when indexing a checkout other than the default RAG repository root.
+- `POST /v1/debug/get_collections` — fetch stored documents/metadatas from the authenticated user's collection, filtered by the token's scopes.
+- `POST /v1/delete_user` — delete a user, their Chroma collection, and their managed user folder after validating `username` and `password`.
+
+The old routes `/v1/add_documents`, `/v1/query_documents`, `/v1/ingest_documents`, and `/v1/collections` are not currently registered in `src/routers/v1.py`.
 
 Errors are surfaced as FastAPI HTTP exceptions (400 for validation, 401/403 for unauthorized, 500 for unexpected Chroma failures).
 
@@ -101,10 +131,10 @@ chat and skips local-only or sensitive paths such as `.git`, `.env`, `.venv`,
 ```bash
 curl http://127.0.0.1:8051/v1/ingest_repository \
   -H 'content-type: application/json' \
-  -d '{"token":"'"$MEDHA_TOKEN"'","scope":"public"}'
+  -d '{"token":"'"$RAG_TOKEN"'","scope":"public"}'
 ```
 
-By default, Medha indexes the repository root containing this RAG service. Pass
+By default, RAG indexes the repository root containing this RAG service. Pass
 `repository_path` only when you intentionally want to index another checkout.
 
 ## User Store
@@ -115,18 +145,27 @@ By default, Medha indexes the repository root containing this RAG service. Pass
 {
   "username": "alice",
   "password": "alice",
-  "scopes": ["user:query"],
-  "token": "randomly generated bearer token",
-  "collection_name": "token-matched collection"
+  "tokens": [
+    {
+      "token": "randomly generated bearer token",
+      "scopes": ["public"],
+      "is_active": "true",
+      "label": "default",
+      "created_at": "2026-09-02T12:00:00+00:00"
+    }
+  ],
+  "collection_name": "generated collection id",
+  "user_id": "generated user id",
+  "folder_path": "data/user_folders/generated user id"
 }
 ```
 
-Update or delete entries in this file to rotate credentials. Tokens are currently stored in plaintext and scoped entirely by their Chroma collection.
+Use `/v1/create_token` to issue additional tokens. Tokens are currently stored in plaintext and scoped by the token record plus the user's Chroma collection.
 
 ## Development
 
 - `uv run pytest` — run the Python test suite (note: legacy tests still target the previous HTTP handler and will need adjustments to reflect the new FastAPI router).
-- `uv run uvicorn run_medha:app --reload` — recommended during development for auto-reload.
+- `uv run uvicorn run_rag:app --reload` — recommended during development for auto-reload.
 
 Use `src/token_utils.generate_strong_token()` if you need to mint tokens manually in scripts or migrations.
 

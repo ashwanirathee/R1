@@ -2,11 +2,11 @@ from fastapi import FastAPI
 
 from routes import router
 from utils import (
-    MEDHA_BASE_URL,
-    MEDHA_REQUESTED_SCOPES,
-    MEDHA_TOKEN,
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
+    RAG_BASE_URL,
+    RAG_REQUESTED_SCOPES,
+    RAG_TOKEN,
     SYSTEM_PROMPT_PATH,
     logger,
 )
@@ -23,9 +23,9 @@ async def log_startup_config() -> None:
         "Starting r1-api model=%s ollama_base_url=%s rag_enabled=%s rag_base_url=%s rag_token_set=%s rag_scopes=%s system_prompt=%s",
         OLLAMA_MODEL,
         OLLAMA_BASE_URL,
-        bool(MEDHA_BASE_URL and MEDHA_TOKEN),
-        MEDHA_BASE_URL or "unset",
-        bool(MEDHA_TOKEN),
-        MEDHA_REQUESTED_SCOPES,
+        bool(RAG_BASE_URL and RAG_TOKEN),
+        RAG_BASE_URL or "unset",
+        bool(RAG_TOKEN),
+        RAG_REQUESTED_SCOPES,
         SYSTEM_PROMPT_PATH,
     )

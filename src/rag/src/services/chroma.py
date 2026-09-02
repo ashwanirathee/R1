@@ -103,8 +103,11 @@ class ChromaService:
             where={"document_id": document_id},
         )
 
-chroma_service = ChromaService()
+chroma_service: ChromaService | None = None
 
 
 def get_chroma_service() -> ChromaService:
+    global chroma_service
+    if chroma_service is None:
+        chroma_service = ChromaService()
     return chroma_service

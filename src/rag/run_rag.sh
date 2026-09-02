@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: ./run_medha.sh [--host 0.0.0.0] [--port 8051]
+# Usage: ./run_rag.sh [--host 0.0.0.0] [--port 8051]
 # Defaults: --host 0.0.0.0 --port 8051
 
 set -euo pipefail
@@ -28,4 +28,4 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$SCRIPT_DIR"
-MEDHA_BUILD_ON_START=true uv run python -m uvicorn run_medha:app --host "$HOST" --port "$PORT" --reload
+RAG_BUILD_ON_START=true uv run python -m uvicorn run_rag:app --host "$HOST" --port "$PORT" --reload

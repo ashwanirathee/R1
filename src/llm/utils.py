@@ -17,15 +17,15 @@ OLLAMA_THINK = os.getenv("OLLAMA_THINK", "false").lower() in {"1", "true", "yes"
 REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
 APP_DIR = Path(__file__).resolve().parent
 SYSTEM_PROMPT_PATH = Path(os.getenv("SYSTEM_PROMPT_PATH", APP_DIR / "prompts" / "persona_1.txt"))
-MEDHA_BASE_URL = os.getenv("MEDHA_BASE_URL")
-MEDHA_TOKEN = os.getenv("MEDHA_TOKEN")
-MEDHA_REQUESTED_SCOPES = [
+RAG_BASE_URL = os.getenv("RAG_BASE_URL")
+RAG_TOKEN = os.getenv("RAG_TOKEN")
+RAG_REQUESTED_SCOPES = [
     scope.strip()
-    for scope in os.getenv("MEDHA_REQUESTED_SCOPES", "public").split(",")
+    for scope in os.getenv("RAG_REQUESTED_SCOPES", "public").split(",")
     if scope.strip()
 ]
-MEDHA_QUERY_LIMIT = int(os.getenv("MEDHA_QUERY_LIMIT", "2"))
-MEDHA_TIMEOUT_SECONDS = float(os.getenv("MEDHA_TIMEOUT_SECONDS", "10"))
+RAG_QUERY_LIMIT = int(os.getenv("RAG_QUERY_LIMIT", "2"))
+RAG_TIMEOUT_SECONDS = float(os.getenv("RAG_TIMEOUT_SECONDS", "10"))
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -140,44 +140,44 @@ def ollama_content(data: dict[str, Any]) -> str:
     return ""
 
 
-def medha_headers() -> dict[str, str]:
+def rag_headers() -> dict[str, str]:
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
-    if MEDHA_TOKEN:
-        headers["Authorization"] = f"Bearer {MEDHA_TOKEN}"
+    if RAG_TOKEN:
+        headers["Authorization"] = f"Bearer {RAG_TOKEN}"
     return headers
 
 
-async def query_medha(query: str) -> dict[str, Any] | None:
-    if not MEDHA_BASE_URL or not MEDHA_TOKEN:
+async def query_rag(query: str) -> dict[str, Any] | None:
+    if not RAG_BASE_URL or not RAG_TOKEN:
         logger.info(
-            "Skipping RAG query medha_base_url_set=%s medha_token_set=%s",
-            bool(MEDHA_BASE_URL),
-            bool(MEDHA_TOKEN),
+            "Skipping RAG query rag_base_url_set=%s rag_token_set=%s",
+            bool(RAG_BASE_URL),
+            bool(RAG_TOKEN),
         )
         return None
 
     payload: dict[str, Any] = {
-        "token": MEDHA_TOKEN,
+        "token": RAG_TOKEN,
         "query": query,
-        "requested_scopes": MEDHA_REQUESTED_SCOPES,
+        "requested_scopes": RAG_REQUESTED_SCOPES,
     }
 
-    timeout = httpx.Timeout(MEDHA_TIMEOUT_SECONDS)
+    timeout = httpx.Timeout(RAG_TIMEOUT_SECONDS)
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             logger.info(
                 "Querying RAG url=%s scopes=%s query_chars=%s",
-                f"{MEDHA_BASE_URL.rstrip('/')}/v1/query",
-                MEDHA_REQUESTED_SCOPES,
+                f"{RAG_BASE_URL.rstrip('/')}/v1/query",
+                RAG_REQUESTED_SCOPES,
                 len(query),
             )
             response = await client.post(
-                f"{MEDHA_BASE_URL.rstrip('/')}/v1/query",
+                f"{RAG_BASE_URL.rstrip('/')}/v1/query",
                 json=payload,
-                headers=medha_headers(),
+                headers=rag_headers(),
             )
             logger.info(
                 "RAG response status=%s response_chars=%s",
@@ -237,13 +237,13 @@ def flatten_chroma_results(results: dict[str, Any]) -> list[dict[str, Any]]:
             item["distance"] = first_distances[index]
 
         items.append(item)
-        if len(items) >= MEDHA_QUERY_LIMIT:
+        if len(items) >= RAG_QUERY_LIMIT:
             break
 
     return items
 
 
-def medha_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+def rag_items(data: dict[str, Any]) -> list[dict[str, Any]]:
     results = data.get("results")
     if isinstance(results, dict):
         return flatten_chroma_results(results)
@@ -263,7 +263,7 @@ def string_value(value: Any) -> str | None:
     return None
 
 
-def medha_item_text(item: dict[str, Any]) -> str | None:
+def rag_item_text(item: dict[str, Any]) -> str | None:
     for key in ("content", "text", "chunk", "page_content", "body", "summary"):
         value = string_value(item.get(key))
         if value:
@@ -279,7 +279,7 @@ def medha_item_text(item: dict[str, Any]) -> str | None:
     return None
 
 
-def medha_item_source(item: dict[str, Any]) -> str | None:
+def rag_item_source(item: dict[str, Any]) -> str | None:
     metadata = item.get("metadata")
     candidates = [item]
     if isinstance(metadata, dict):
@@ -290,7 +290,7 @@ def medha_item_source(item: dict[str, Any]) -> str | None:
         candidates.append(document)
 
     for candidate in candidates:
-        for key in ("source", "title", "url", "path", "document_id", "id"):
+        for key in ("source", "relative_path", "filename", "title", "url", "path", "document_id", "id"):
             value = string_value(candidate.get(key))
             if value:
                 return value
@@ -298,7 +298,7 @@ def medha_item_source(item: dict[str, Any]) -> str | None:
 
 
 def sanitize_retrieved_context(text: str) -> str:
-    return text.replace("Medha", "RAG").replace("medha", "rag")
+    return text
 
 
 def format_rag_context(data: dict[str, Any] | None) -> str | None:
@@ -307,15 +307,15 @@ def format_rag_context(data: dict[str, Any] | None) -> str | None:
         return None
 
     context_blocks: list[str] = []
-    items = medha_items(data)
+    items = rag_items(data)
     logger.info("Formatting RAG context candidate_items=%s", len(items))
     for index, item in enumerate(items, start=1):
-        text = medha_item_text(item)
+        text = rag_item_text(item)
         if not text:
             continue
         text = sanitize_retrieved_context(text)
 
-        source = medha_item_source(item)
+        source = rag_item_source(item)
         heading = f"[{index}]"
         if source:
             heading = f"{heading} {source}"
@@ -337,7 +337,7 @@ def latest_user_message(messages: list[ChatMessage]) -> str | None:
 
 
 async def rag_enriched_user_text(user_text: str, log_label: str) -> str:
-    rag_context = format_rag_context(await query_medha(user_text))
+    rag_context = format_rag_context(await query_rag(user_text))
     if rag_context:
         logger.info("%s using RAG context chars=%s", log_label, len(rag_context))
         return (
@@ -373,14 +373,14 @@ async def rag_enriched_messages(messages: list[ChatMessage], log_label: str) -> 
 
 
 async def check_rag_health() -> str:
-    if not MEDHA_BASE_URL:
+    if not RAG_BASE_URL:
         return "disabled"
 
-    async with httpx.AsyncClient(timeout=MEDHA_TIMEOUT_SECONDS) as client:
+    async with httpx.AsyncClient(timeout=RAG_TIMEOUT_SECONDS) as client:
         try:
             response = await client.get(
-                f"{MEDHA_BASE_URL.rstrip('/')}/health",
-                headers=medha_headers(),
+                f"{RAG_BASE_URL.rstrip('/')}/health",
+                headers=rag_headers(),
             )
             response.raise_for_status()
         except httpx.HTTPError:
