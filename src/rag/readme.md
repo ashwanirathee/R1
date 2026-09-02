@@ -1,11 +1,11 @@
-# Medha
+RAG
 
-Medha is a FastAPI service that provisions per-user collections inside a running ChromaDB instance. It exposes endpoints for user signup, document ingestion, folder-based bulk indexing, and retrieval over the stored chunks.
+RAG is a FastAPI service that provisions per-user collections inside a running ChromaDB instance. It exposes endpoints for user signup, document ingestion, folder-based bulk indexing, and retrieval over the stored chunks.
 
 ## What Ships In This Repo
 
-- `run_medha.py`: FastAPI application that wires the `v1` router.
-- `run_medha.sh`: helper wrapper around `uv run uvicorn run_medha:app` with sensible host/port defaults.
+- `run_rag.py`: FastAPI application that wires the `v1` router.
+- `run_rag.sh`: helper wrapper around `uv run uvicorn run_rag:app` with sensible host/port defaults.
 - `src/routers/v1.py`: request handlers for signup, ingestion, querying, and health.
 - `src/services/chroma.py`: thin client around `chromadb.HttpClient` (expects a Chroma server on `localhost:8000`).
 - `src/services/ingest.py`: folder ingestion utilities (PDF/Text/Markdown parsing, fixed-size chunking, and metadata generation).
@@ -24,7 +24,7 @@ The code now depends on the Chroma HTTP API for persistence.
 Set up Python dependencies:
 
 ```bash
-cd /Users/ash/Documents/work/medha
+cd ./r1/rag
 uv sync
 ```
 
@@ -41,13 +41,13 @@ Docker-based Chroma deployments work too as long as the FastAPI process can reac
 Launch the server with `uvicorn`:
 
 ```bash
-uv run uvicorn run_medha:app --host 127.0.0.1 --port 8051 --reload
+uv run uvicorn run_rag:app --host 127.0.0.1 --port 8051 --reload
 ```
 
 Or rely on the helper script (defaults to `0.0.0.0:8051` so you can hit it from other devices on the network):
 
 ```bash
-./run_medha.sh [--host 0.0.0.0] [--port 8051]
+./run_rag.sh [--host 0.0.0.0] [--port 8051]
 ```
 
 Hit `GET /health` to verify readiness.
@@ -58,6 +58,7 @@ All routes live under `src/routers/v1.py`:
 
 - `GET /health` — basic readiness probe.
 - `POST /v1/signup` — register a user. Creates a Chroma collection named after the generated bearer token and stores the record. Body:
+
   ```json
   {
     "username": "demo",
@@ -68,6 +69,7 @@ All routes live under `src/routers/v1.py`:
 
   Response includes `bearer_token`.
 - `POST /v1/add_documents` — manually add raw text chunks to the caller's collection.
+
   ```json
   {
     "token": "bearer token from signup",
@@ -104,7 +106,7 @@ curl http://127.0.0.1:8051/v1/ingest_repository \
   -d '{"token":"'"$MEDHA_TOKEN"'","scope":"public"}'
 ```
 
-By default, Medha indexes the repository root containing this RAG service. Pass
+By default, RAG indexes the repository root containing this RAG service. Pass
 `repository_path` only when you intentionally want to index another checkout.
 
 ## User Store
@@ -126,7 +128,7 @@ Update or delete entries in this file to rotate credentials. Tokens are currentl
 ## Development
 
 - `uv run pytest` — run the Python test suite (note: legacy tests still target the previous HTTP handler and will need adjustments to reflect the new FastAPI router).
-- `uv run uvicorn run_medha:app --reload` — recommended during development for auto-reload.
+- `uv run uvicorn run_rag:app --reload` — recommended during development for auto-reload.
 
 Use `src/token_utils.generate_strong_token()` if you need to mint tokens manually in scripts or migrations.
 

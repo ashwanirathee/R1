@@ -290,7 +290,7 @@ def medha_item_source(item: dict[str, Any]) -> str | None:
         candidates.append(document)
 
     for candidate in candidates:
-        for key in ("source", "title", "url", "path", "document_id", "id"):
+        for key in ("source", "relative_path", "filename", "title", "url", "path", "document_id", "id"):
             value = string_value(candidate.get(key))
             if value:
                 return value

@@ -1,254 +1,203 @@
-import json
-import threading
-import urllib.error
-import urllib.request
-from http.server import ThreadingHTTPServer
-from pathlib import Path
+from fastapi.testclient import TestClient
 
-import pytest
-
-from src import api
+from run_rag import app
+from src.routers import v1
+from src.services.chroma import get_chroma_service
+from src.services.ingest import get_ingestion_service
+from src.services.user import get_user_data_service
 
 
-TEST_DOCUMENTS = [
-    {
-        "id": "shared-doc",
-        "title": "Shared Doc",
-        "collection": "shared",
-        "tags": ["alpha"],
-        "updated_at": "2026-03-22",
-        "content": "Shared content for retrieval.",
-    },
-    {
-        "id": "private-doc",
-        "title": "Private Doc",
-        "collection": "private",
-        "tags": ["secret"],
-        "updated_at": "2026-03-22",
-        "content": "Private content.",
-    },
-]
+class FakeChromaService:
+    def __init__(self):
+        self.created_collections = []
+        self.query_calls = []
 
-TEST_TOKENS = {
-    "reader-token": api.AccessRule(
-        name="reader",
-        scopes={"documents:read", "knowledge:query"},
-        collections={"shared"},
-    ),
-    "admin-token": api.AccessRule(
-        name="admin",
-        scopes={"*"},
-        collections={"*"},
-    ),
-    "query-only-token": api.AccessRule(
-        name="query-only",
-        scopes={"knowledge:query"},
-        collections={"shared"},
-    ),
-}
+    def create_collection(self, name: str):
+        self.created_collections.append(name)
+        return 0
 
-
-def make_request(
-    url: str,
-    method: str = "GET",
-    token: str | None = None,
-    payload: dict | None = None,
-):
-    headers = {}
-    body = None
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    if payload is not None:
-        headers["Content-Type"] = "application/json"
-        body = json.dumps(payload).encode("utf-8")
-
-    request = urllib.request.Request(
-        url=url,
-        method=method,
-        headers=headers,
-        data=body,
-    )
-    return urllib.request.urlopen(request, timeout=2)
-
-
-@pytest.fixture
-def api_server(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr(api, "load_documents", lambda: TEST_DOCUMENTS)
-    monkeypatch.setattr(api, "load_tokens", lambda: TEST_TOKENS)
-    monkeypatch.setattr(api, "load_vector_store", lambda: object())
-    monkeypatch.setattr(
-        api,
-        "query_vector_store",
-        lambda query, limit, collections, vector_store: [
+    def query(self, collection_name, query_texts, n_results=5, decided_scopes=None):
+        self.query_calls.append(
             {
-                "score": 0.91,
-                "document": {
-                    "id": "shared-doc",
-                    "title": "Shared Doc",
-                    "collection": "shared",
-                    "tags": ["alpha"],
-                    "updated_at": "2026-03-22",
-                },
-                "chunk": {
-                    "id": "shared-doc::chunk::0",
-                    "start_index": 0,
-                },
-                "content": f"match for: {query}",
+                "collection_name": collection_name,
+                "query_texts": query_texts,
+                "n_results": n_results,
+                "decided_scopes": decided_scopes,
             }
-        ][:limit],
-    )
+        )
+        return {"documents": [["R1 answer"]], "metadatas": [[{"scope": "public"}]]}
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), api.MedhaHandler)
-    server.documents = TEST_DOCUMENTS
-    server.tokens = TEST_TOKENS
-    server.vector_store = object()
 
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    base_url = f"http://127.0.0.1:{server.server_port}"
+class FakeIngestionService:
+    def __init__(self):
+        self.repository_calls = []
+
+    def ingest_repository(self, **kwargs):
+        self.repository_calls.append(kwargs)
+        if kwargs["scope"] not in kwargs["scopes"]:
+            return {"status": "error", "detail": "scope_not_allowed"}
+        return {"status": "ok", "indexed_files": 1, "indexed_chunks": 1}
+
+
+class FakeUserDataService:
+    def __init__(self, users=None):
+        self.users = list(users or [])
+
+    def load_users(self):
+        return self.users
+
+    def save_users(self, users):
+        self.users = users
+
+    def validate_user(self, username, password):
+        for user in self.users:
+            if user.get("username") == username and user.get("password") == password:
+                return user
+        return None
+
+    def update_user(self, user):
+        for index, existing_user in enumerate(self.users):
+            if existing_user.get("username") == user.get("username"):
+                self.users[index] = user
+                return 0
+        return -1
+
+    def get_user_by_token(self, token):
+        for user in self.users:
+            for token_record in user.get("tokens", []):
+                if token_record.get("token") == token:
+                    return user
+        return None
+
+    def validate_token(self, token):
+        return self.get_user_by_token(token) is not None
+
+    def require_user(self, token):
+        user = self.get_user_by_token(token)
+        if user is None:
+            raise AssertionError("unexpected invalid token in test")
+        return user
+
+    def get_token_scopes(self, token):
+        user = self.get_user_by_token(token)
+        if not user:
+            return None
+        for token_record in user.get("tokens", []):
+            if token_record.get("token") == token:
+                return token_record.get("scopes", [])
+        return None
+
+
+def test_health_does_not_require_auth():
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_signup_creates_collection_user_and_scope_folders(monkeypatch, tmp_path):
+    fake_chroma = FakeChromaService()
+    fake_users = FakeUserDataService()
+    monkeypatch.setattr(v1, "USER_FOLDERS_ROOT", tmp_path)
+    monkeypatch.setattr(v1, "generate_unique_id", lambda: "generated-id")
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
 
     try:
-        yield base_url, server
+        response = TestClient(app).post(
+            "/v1/signup",
+            json={"username": "ash", "password": "pass"},
+        )
     finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+    assert fake_chroma.created_collections == ["generated-id"]
+    assert fake_users.users[0]["username"] == "ash"
+    for scope in ["secret", "private", "private_safe", "public"]:
+        assert (tmp_path / "generated-id" / scope).is_dir()
 
 
-def test_health_does_not_require_auth(api_server):
-    base_url, _ = api_server
+def test_create_token_intersects_requested_scopes_with_allowed_scopes(monkeypatch):
+    fake_users = FakeUserDataService(
+        [{"username": "ash", "password": "pass", "tokens": []}]
+    )
+    monkeypatch.setattr(v1, "generate_strong_token", lambda: "token-1")
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
 
-    with make_request(f"{base_url}/health") as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    assert response.status == 200
-    assert payload == {"status": "ok"}
-
-
-def test_documents_requires_bearer_token(api_server):
-    base_url, _ = api_server
-
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        make_request(f"{base_url}/v1/documents")
-
-    assert exc_info.value.code == 401
-    payload = json.loads(exc_info.value.read().decode("utf-8"))
-    assert payload["error"] == "missing_bearer_token"
-
-
-def test_documents_list_is_filtered_by_token_collections(api_server):
-    base_url, _ = api_server
-
-    with make_request(f"{base_url}/v1/documents", token="reader-token") as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    assert response.status == 200
-    assert payload["documents"] == [
-        {
-            "id": "shared-doc",
-            "title": "Shared Doc",
-            "collection": "shared",
-            "tags": ["alpha"],
-            "updated_at": "2026-03-22",
-        }
-    ]
-
-
-def test_document_detail_blocks_forbidden_collection(api_server):
-    base_url, _ = api_server
-
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        make_request(f"{base_url}/v1/documents/private-doc", token="reader-token")
-
-    assert exc_info.value.code == 403
-    payload = json.loads(exc_info.value.read().decode("utf-8"))
-    assert payload["error"] == "collection_forbidden"
-
-
-def test_query_returns_vector_results(api_server):
-    base_url, _ = api_server
-
-    with make_request(
-        f"{base_url}/v1/query",
-        method="POST",
-        token="reader-token",
-        payload={"query": "shared retrieval", "limit": 1},
-    ) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    assert response.status == 200
-    assert payload["query"] == "shared retrieval"
-    assert len(payload["results"]) == 1
-    assert payload["results"][0]["document"]["id"] == "shared-doc"
-    assert payload["results"][0]["content"] == "match for: shared retrieval"
-
-
-def test_query_rejects_disallowed_requested_collections(api_server):
-    base_url, _ = api_server
-
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        make_request(
-            f"{base_url}/v1/query",
-            method="POST",
-            token="reader-token",
-            payload={"query": "secret", "collections": ["private"]},
+    try:
+        response = TestClient(app).post(
+            "/v1/create_token",
+            json={
+                "username": "ash",
+                "password": "pass",
+                "scopes": ["public", "not-real"],
+                "label": "ci",
+            },
         )
+    finally:
+        app.dependency_overrides.clear()
 
-    assert exc_info.value.code == 403
-    payload = json.loads(exc_info.value.read().decode("utf-8"))
-    assert payload["error"] == "collection_forbidden"
+    assert response.status_code == 200
+    assert response.json()["bearer_token"] == "token-1"
+    assert fake_users.users[0]["tokens"][0]["scopes"] == ["public"]
 
 
-def test_query_returns_service_unavailable_when_index_missing(
-    api_server, monkeypatch
-):
-    base_url, server = api_server
+def test_query_uses_intersection_of_requested_and_token_scopes():
+    fake_chroma = FakeChromaService()
+    fake_users = FakeUserDataService(
+        [
+            {
+                "collection_name": "collection-1",
+                "tokens": [{"token": "token-1", "scopes": ["public"]}],
+            }
+        ]
+    )
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
 
-    def raise_missing_index(**kwargs):
-        raise FileNotFoundError("index missing")
-
-    monkeypatch.setattr(api, "query_vector_store", raise_missing_index)
-    server.vector_store = None
-
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        make_request(
-            f"{base_url}/v1/query",
-            method="POST",
-            token="reader-token",
-            payload={"query": "shared retrieval"},
+    try:
+        response = TestClient(app).post(
+            "/v1/query",
+            json={
+                "token": "token-1",
+                "query": "where is the R1 docs?",
+                "requested_scopes": ["public", "secret"],
+            },
         )
+    finally:
+        app.dependency_overrides.clear()
 
-    assert exc_info.value.code == 503
-    payload = json.loads(exc_info.value.read().decode("utf-8"))
-    assert payload["error"] == "index_not_built"
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert fake_chroma.query_calls[0]["decided_scopes"] == ["public"]
 
 
-def test_admin_reload_requires_admin_scope(api_server):
-    base_url, _ = api_server
+def test_ingest_repository_blocks_scope_not_granted_to_token():
+    fake_chroma = FakeChromaService()
+    fake_ingestion = FakeIngestionService()
+    fake_users = FakeUserDataService(
+        [
+            {
+                "collection_name": "collection-1",
+                "tokens": [{"token": "token-1", "scopes": ["public"]}],
+            }
+        ]
+    )
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_ingestion_service] = lambda: fake_ingestion
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
 
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        make_request(
-            f"{base_url}/v1/admin/reload",
-            method="POST",
-            token="reader-token",
-            payload={},
+    try:
+        response = TestClient(app).post(
+            "/v1/ingest_repository",
+            json={"token": "token-1", "scope": "secret"},
         )
+    finally:
+        app.dependency_overrides.clear()
 
-    assert exc_info.value.code == 403
-    payload = json.loads(exc_info.value.read().decode("utf-8"))
-    assert payload["error"] == "missing_scope"
-
-
-def test_admin_reload_succeeds_for_admin_token(api_server):
-    base_url, _ = api_server
-
-    with make_request(
-        f"{base_url}/v1/admin/reload",
-        method="POST",
-        token="admin-token",
-        payload={},
-    ) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    assert response.status == 200
-    assert payload["status"] == "reloaded"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "scope_not_allowed"
