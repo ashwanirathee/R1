@@ -28,4 +28,4 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$SCRIPT_DIR"
-MEDHA_BUILD_ON_START=true uv run python -m uvicorn run_rag:app --host "$HOST" --port "$PORT" --reload
+RAG_BUILD_ON_START=true uv run python -m uvicorn run_rag:app --host "$HOST" --port "$PORT" --reload

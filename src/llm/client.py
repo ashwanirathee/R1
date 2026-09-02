@@ -6,7 +6,7 @@ from typing import Any
 
 
 @dataclass
-class MedhaClient:
+class RagClient:
     base_url: str
     token: str
     timeout: float = 2.0
@@ -66,4 +66,4 @@ class MedhaClient:
         return self._request("POST", "/v1/admin/reload", payload={})
 
 
-LibrarianClient = MedhaClient
+LibrarianClient = RagClient

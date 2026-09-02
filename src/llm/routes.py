@@ -5,10 +5,10 @@ from fastapi.responses import StreamingResponse
 
 from definitions import ChatMessage, ChatRequest, FrontendChatRequest, GenerateRequest
 from utils import (
-    MEDHA_BASE_URL,
     MURPHY_SYSTEM_PROMPT,
     OLLAMA_MODEL,
     OLLAMA_THINK,
+    RAG_BASE_URL,
     chat_with_ollama,
     check_ollama_health,
     check_rag_health,
@@ -30,7 +30,7 @@ async def root() -> dict[str, str]:
     return {
         "service": "r1-api",
         "model": OLLAMA_MODEL,
-        "rag": "enabled" if MEDHA_BASE_URL else "disabled",
+        "rag": "enabled" if RAG_BASE_URL else "disabled",
     }
 
 

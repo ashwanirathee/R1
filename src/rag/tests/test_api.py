@@ -10,7 +10,9 @@ from src.services.user import get_user_data_service
 class FakeChromaService:
     def __init__(self):
         self.created_collections = []
+        self.deleted_collections = []
         self.query_calls = []
+        self.collection_data_calls = []
 
     def create_collection(self, name: str):
         self.created_collections.append(name)
@@ -27,10 +29,28 @@ class FakeChromaService:
         )
         return {"documents": [["R1 answer"]], "metadatas": [[{"scope": "public"}]]}
 
+    def get_collection_data(self, collection_name, scopes=None):
+        self.collection_data_calls.append(
+            {
+                "collection_name": collection_name,
+                "scopes": scopes,
+            }
+        )
+        return {"documents": ["R1 answer"], "metadatas": [{"scope": "public"}]}
+
+    def delete_collection(self, collection_name):
+        self.deleted_collections.append(collection_name)
+        return 0
+
 
 class FakeIngestionService:
     def __init__(self):
+        self.folder_calls = []
         self.repository_calls = []
+
+    def ingest_folder(self, **kwargs):
+        self.folder_calls.append(kwargs)
+        return {"status": "ok", "indexed_files": 2, "indexed_chunks": 3}
 
     def ingest_repository(self, **kwargs):
         self.repository_calls.append(kwargs)
@@ -61,6 +81,13 @@ class FakeUserDataService:
                 self.users[index] = user
                 return 0
         return -1
+
+    def delete_user(self, username, password):
+        self.users = [
+            user
+            for user in self.users
+            if user.get("username") != username or user.get("password") != password
+        ]
 
     def get_user_by_token(self, token):
         for user in self.users:
@@ -117,6 +144,7 @@ def test_signup_creates_collection_user_and_scope_folders(monkeypatch, tmp_path)
     assert response.json() == {"status": "success"}
     assert fake_chroma.created_collections == ["generated-id"]
     assert fake_users.users[0]["username"] == "ash"
+    assert fake_users.users[0]["tokens"] == []
     for scope in ["secret", "private", "private_safe", "public"]:
         assert (tmp_path / "generated-id" / scope).is_dir()
 
@@ -144,6 +172,30 @@ def test_create_token_intersects_requested_scopes_with_allowed_scopes(monkeypatc
     assert response.status_code == 200
     assert response.json()["bearer_token"] == "token-1"
     assert fake_users.users[0]["tokens"][0]["scopes"] == ["public"]
+
+
+def test_create_token_rejects_invalid_requested_scopes():
+    fake_users = FakeUserDataService(
+        [{"username": "ash", "password": "pass", "tokens": []}]
+    )
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
+
+    try:
+        response = TestClient(app).post(
+            "/v1/create_token",
+            json={
+                "username": "ash",
+                "password": "pass",
+                "scopes": ["not-real"],
+                "label": "ci",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_scopes"
+    assert fake_users.users[0]["tokens"] == []
 
 
 def test_query_uses_intersection_of_requested_and_token_scopes():
@@ -176,6 +228,37 @@ def test_query_uses_intersection_of_requested_and_token_scopes():
     assert fake_chroma.query_calls[0]["decided_scopes"] == ["public"]
 
 
+def test_ingest_refresh_uses_stored_user_folder_and_token_scopes():
+    fake_chroma = FakeChromaService()
+    fake_ingestion = FakeIngestionService()
+    fake_users = FakeUserDataService(
+        [
+            {
+                "collection_name": "collection-1",
+                "folder_path": "/managed/user/folder",
+                "tokens": [{"token": "token-1", "scopes": ["public", "private"]}],
+            }
+        ]
+    )
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_ingestion_service] = lambda: fake_ingestion
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
+
+    try:
+        response = TestClient(app).post(
+            "/v1/ingest_refresh",
+            json={"token": "token-1", "folder_path": "/caller/supplied/path"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["indexed_chunks"] == 3
+    assert fake_ingestion.folder_calls[0]["folder_path"] == "/managed/user/folder"
+    assert fake_ingestion.folder_calls[0]["collection_name"] == "collection-1"
+    assert fake_ingestion.folder_calls[0]["scopes"] == ["public", "private"]
+
+
 def test_ingest_repository_blocks_scope_not_granted_to_token():
     fake_chroma = FakeChromaService()
     fake_ingestion = FakeIngestionService()
@@ -201,3 +284,78 @@ def test_ingest_repository_blocks_scope_not_granted_to_token():
 
     assert response.status_code == 403
     assert response.json()["detail"] == "scope_not_allowed"
+
+
+def test_debug_get_collections_fetches_authenticated_collection_with_token_scopes():
+    fake_chroma = FakeChromaService()
+    fake_users = FakeUserDataService(
+        [
+            {
+                "collection_name": "collection-1",
+                "tokens": [{"token": "token-1", "scopes": ["public"]}],
+            }
+        ]
+    )
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
+
+    try:
+        response = TestClient(app).post(
+            "/v1/debug/get_collections",
+            json={"token": "token-1"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["documents"] == ["R1 answer"]
+    assert fake_chroma.collection_data_calls == [
+        {"collection_name": "collection-1", "scopes": ["public"]}
+    ]
+
+
+def test_delete_user_removes_collection_folder_and_user_record(tmp_path):
+    user_folder = tmp_path / "user-1"
+    user_folder.mkdir()
+    (user_folder / "public").mkdir()
+    fake_chroma = FakeChromaService()
+    fake_users = FakeUserDataService(
+        [
+            {
+                "username": "ash",
+                "password": "pass",
+                "collection_name": "collection-1",
+                "folder_path": str(user_folder),
+                "tokens": [],
+            }
+        ]
+    )
+    app.dependency_overrides[get_chroma_service] = lambda: fake_chroma
+    app.dependency_overrides[get_user_data_service] = lambda: fake_users
+
+    try:
+        response = TestClient(app).post(
+            "/v1/delete_user",
+            json={"username": "ash", "password": "pass"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+    assert fake_chroma.deleted_collections == ["collection-1"]
+    assert not user_folder.exists()
+    assert fake_users.users == []
+
+
+def test_legacy_endpoint_names_are_not_registered():
+    client = TestClient(app)
+
+    for path in [
+        "/v1/add_documents",
+        "/v1/query_documents",
+        "/v1/ingest_documents",
+        "/v1/collections",
+    ]:
+        response = client.post(path, json={})
+        assert response.status_code == 404
