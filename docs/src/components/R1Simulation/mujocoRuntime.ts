@@ -54,6 +54,7 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
   const obstacleGeoms = Array.from({ length: OBSTACLE_COUNT }, (_, index) =>
     model.geom(`obstacle_${index}`)
   );
+  let disposed = false;
 
   // The obstacle bodies exist in the MJCF from startup. Moving/resizing them is
   // cheaper and more reliable than rebuilding the MuJoCo model for each click.
@@ -75,12 +76,14 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
   return {
     xml,
     setControls: (forward, turn) => {
+      if (disposed) return;
       // Actuators map high-level drive/turn controls onto all wheel joints via
       // fixed tendons declared in car.xml.
       data.ctrl[forwardActuatorId] = forward;
       data.ctrl[turnActuatorId] = turn;
     },
     step: (deltaSeconds) => {
+      if (disposed) return;
       const steps = Math.max(1, Math.min(25, Math.round(deltaSeconds / timestep)));
 
       for (let index = 0; index < steps; index += 1) {
@@ -89,11 +92,19 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
       }
     },
     reset: () => {
+      if (disposed) return;
       mujoco.mj_resetData(model, data);
       mujoco.mj_setConst(model, data);
       mujoco.mj_forward(model, data);
     },
     getCarPose: () => {
+      if (disposed) {
+        return {
+          position: [0, 0, 0],
+          quaternion: [1, 0, 0, 0],
+        };
+      }
+
       const carBody = data.body("car");
       const position: [number, number, number] = [
         carBody.xpos[0],
@@ -114,8 +125,9 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
         quaternion,
       };
     },
-    getContactCount: () => data.ncon,
+    getContactCount: () => (disposed ? 0 : data.ncon),
     setObstacle: (index, obstacle) => {
+      if (disposed) return;
       const body = obstacleBodies[index];
       const geom = obstacleGeoms[index];
       if (!body || !geom) return;
@@ -133,6 +145,8 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
       mujoco.mj_forward(model, data);
     },
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
       obstacleBodies.forEach((body) => body.delete?.());
       obstacleGeoms.forEach((geom) => geom.delete?.());
       data.delete?.();

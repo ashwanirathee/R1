@@ -1,8 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { disposeMaterial, loadCarObject, spinWheels } from "./carModel";
 import {
+  disposeMaterial,
+  loadCarObject,
+  loadGltfWithFallback,
+  spinWheels,
+} from "./carModel";
+import {
+  EARTH_GLB_URLS,
   INITIAL_CAMERA_POSITION,
   INITIAL_CAMERA_TARGET,
   WHEEL_SPIN_RATE,
@@ -34,10 +40,12 @@ const THREE_TO_MUJOCO_QUATERNION = MUJOCO_TO_THREE_QUATERNION.clone().invert();
 const OBSTACLE_LIMIT = 5;
 const OBSTACLE_BOUNDS = 0.68;
 const EULER = new THREE.Euler(0, 0, 0, "YXZ");
+const CAMERA_MODES = ["Car view", "Follow behind"] as const;
+type CameraMode = (typeof CAMERA_MODES)[number];
 
 // Builds and runs the Three.js render loop that mirrors the MuJoCo simulation.
 export async function renderCarScene(
-  glbUrl: string,
+  glbUrl: string | readonly string[],
   canvas: HTMLCanvasElement | null,
   gui: GuiInstance | null,
   mujoco: MujocoSimulation
@@ -58,6 +66,8 @@ export async function renderCarScene(
   // Build the visible terrain from the exact hfield encoded in the loaded MJCF.
   const environment = addMoonEnvironment(scene, parseMujocoHfield(mujoco.xml));
   const grid = environment.grid;
+  const earth = await loadSkyEarth(EARTH_GLB_URLS);
+  scene.add(earth);
   const rawCar = await loadCarObject(glbUrl);
   const car = new THREE.Group();
   car.add(rawCar);
@@ -105,6 +115,7 @@ export async function renderCarScene(
     keyboard: true,
     drivePower: 1.2,
     turnPower: 0.9,
+    cameraMode: "Car view" as CameraMode,
     idleRotation: false,
     showGrid: true,
     showVisualCar: true,
@@ -130,13 +141,18 @@ export async function renderCarScene(
     },
     // GUI action: restore the default orbit-camera view.
     resetCamera: () => {
-      camera.position.copy(INITIAL_CAMERA_POSITION);
-      orbitControls.target.copy(INITIAL_CAMERA_TARGET);
-      orbitControls.update();
+      if (settings.cameraMode === "Follow behind") {
+        resetFollowCamera();
+      } else {
+        camera.position.copy(INITIAL_CAMERA_POSITION);
+        orbitControls.target.copy(INITIAL_CAMERA_TARGET);
+        orbitControls.update();
+      }
     },
   };
   let lastFrameTime = performance.now();
   let animationFrame = 0;
+  let disposed = false;
 
   // Clears remembered keyboard state when controls are disabled or reset.
   const clearKeys = () => {
@@ -168,6 +184,38 @@ export async function renderCarScene(
       EULER.setFromQuaternion(car.quaternion);
       car.quaternion.setFromEuler(new THREE.Euler(0, EULER.y, 0, "YXZ"));
     }
+  };
+
+  const updateCameraMode = () => {
+    orbitControls.enabled = true;
+    if (settings.cameraMode === "Follow behind") {
+      resetFollowCamera();
+    }
+  };
+
+  const resetFollowCamera = () => {
+    const cameraPosition = new THREE.Vector3(0, 0.24, 0.68);
+    const cameraTarget = getFollowCameraTarget();
+
+    car.localToWorld(cameraPosition);
+    camera.position.copy(cameraPosition);
+    orbitControls.target.copy(cameraTarget);
+    orbitControls.update();
+  };
+
+  const getFollowCameraTarget = () => {
+    const cameraTarget = new THREE.Vector3(0, 0.055, -0.35);
+    car.localToWorld(cameraTarget);
+    return cameraTarget;
+  };
+
+  const updateFollowCameraTarget = () => {
+    const nextTarget = getFollowCameraTarget();
+    const targetDelta = nextTarget.sub(orbitControls.target);
+
+    orbitControls.target.add(targetDelta);
+    camera.position.add(targetDelta);
+    orbitControls.update();
   };
 
   // Places a new obstacle a short distance ahead of the current car heading.
@@ -322,10 +370,11 @@ export async function renderCarScene(
 
   // Advances MuJoCo, updates visual-only effects, and renders each frame.
   const animate = () => {
+    if (disposed) return;
+
     const frameTime = performance.now();
     const deltaSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.05);
     lastFrameTime = frameTime;
-
     if (settings.keyboard) {
       // WASD controls are expressed as throttle + differential turn, then
       // passed to MuJoCo actuators. Wheel mesh spin is visual only.
@@ -364,12 +413,18 @@ export async function renderCarScene(
       applyPose();
     }
 
-    orbitControls.update();
+    if (settings.cameraMode === "Follow behind") {
+      updateFollowCameraTarget();
+    } else {
+      orbitControls.update();
+    }
     if (settings.showPhysicsDebug) {
       debugState.contacts = mujoco.getContactCount();
     }
     renderer.render(scene, camera);
-    animationFrame = window.requestAnimationFrame(animate);
+    if (!disposed) {
+      animationFrame = window.requestAnimationFrame(animate);
+    }
   };
 
   resize();
@@ -380,6 +435,12 @@ export async function renderCarScene(
   canvas.addEventListener("pointerdown", pointerDown);
 
   const controlsFolder = gui?.addFolder("Drive");
+  controlsFolder
+    ?.add(settings, "cameraMode", CAMERA_MODES)
+    .name("Camera")
+    .onChange(() => {
+      updateCameraMode();
+    });
   controlsFolder
     ?.add(settings, "keyboard")
     .name("WASD drive")
@@ -444,6 +505,8 @@ export async function renderCarScene(
 
   return {
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", keyDown);
@@ -466,6 +529,68 @@ export async function renderCarScene(
       renderer.dispose();
     },
   };
+}
+
+async function loadSkyEarth(glbUrl: string | readonly string[]) {
+  const gltf = await loadGltfWithFallback(glbUrl);
+  const earth = gltf.scene;
+
+  const bounds = new THREE.Box3().setFromObject(earth);
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  earth.position.sub(center);
+
+  const largestSide = Math.max(size.x, size.y, size.z);
+  if (Number.isFinite(largestSide) && largestSide > 0) {
+    earth.scale.multiplyScalar(14 / largestSide);
+  }
+
+  earth.position.set(-1.35, -2.75, -8.5);
+  earth.rotation.set(-0.131592653589793, 0.898407346410207, 0);
+  earth.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.castShadow = false;
+      object.receiveShadow = false;
+      object.renderOrder = 0;
+      const materials = Array.isArray(object.material)
+        ? object.material
+        : [object.material];
+      const brightMaterials = materials.map((material) => createBrightEarthMaterial(material));
+      object.material = Array.isArray(object.material)
+        ? brightMaterials
+        : brightMaterials[0];
+    }
+  });
+
+  return earth;
+}
+
+function createBrightEarthMaterial(material: THREE.Material) {
+  const source = material as THREE.MeshStandardMaterial;
+  const texture = source.map ?? source.emissiveMap ?? null;
+  if (texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+  }
+
+  const isInvisibleOverlay = source.transparent && source.opacity <= 0.01;
+  const brightMaterial = new THREE.MeshBasicMaterial({
+    color: isInvisibleOverlay ? 0xffffff : new THREE.Color(1.65, 1.65, 1.65),
+    map: texture,
+    transparent: source.transparent,
+    opacity: isInvisibleOverlay ? 0 : source.opacity,
+    side: source.side,
+    depthTest: true,
+    depthWrite: !source.transparent,
+    fog: false,
+    toneMapped: false,
+  });
+
+  if (source.name) {
+    brightMaterial.name = `${source.name}-bright`;
+  }
+
+  return brightMaterial;
 }
 
 // Creates the WebGL renderer with tone mapping and shadows enabled.

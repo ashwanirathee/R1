@@ -22,6 +22,7 @@ This repository doesn't focus on writing out the concepts but more about impleme
 ### Setup Instructions:
 
 ### ROS Instructions
+
 ```
 # base setup
 cd /home/ubuntu/r1
@@ -57,6 +58,7 @@ ros2 run r1 node_name
 ```
 
 ### Docker Instructions
+
 ```
 # build docker container
 docker build -t r1-ros .
@@ -85,6 +87,7 @@ docker rmi r1-ros
 ### Specific Nodes behaviors:
 
 ##### Audio Node and its bluetooth bridge:
+
 ```
 # audio control
 pactl list short sinks
@@ -110,6 +113,7 @@ ollama serve
 ```
 
 #### Foxglove Visualization
+
 ```
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
@@ -120,9 +124,14 @@ There is need for a remote server that handle computational loads for R1 that ar
 
 #### R1 System Monitor
 
-We setup Grafana and Prometheus to monitor the system. It allows us to visualize the system's performance and identify potential issues. 
+We setup Grafana and Prometheus to monitor the system. It allows us to visualize the system's performance and identify potential issues.
+
+### Acknowledgements:
+
+- [Earth](https://skfb.ly/69KtT) by Gravity Jack is licensed under [Creative Commons Attribution](http://creativecommons.org/licenses/by/4.0/). It's used in the simulation in docs.
 
 ### References:
+
 - ROS 2 documentation: https://docs.ros.org/
 - https://github.com/apple/ml-cubifyanything
 - https://arxiv.org/abs/2005.14165

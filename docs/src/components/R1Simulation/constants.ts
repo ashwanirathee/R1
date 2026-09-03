@@ -3,7 +3,14 @@ import * as THREE from "three";
 export const MUJOCO_MODULE_URL = "/mujoco/mujoco.js";
 export const MUJOCO_WASM_URL = "/mujoco/mujoco.wasm";
 export const CAR_XML_URL = "/mujoco/car.xml";
-export const CAR_GLB_URL = "/mujoco/sam_model2.glb";
+export const CAR_GLB_URLS = [
+  "https://cdn.ashwanirathee.com/models/sam_model2.glb",
+  "/mujoco/sam_model2.glb",
+] as const;
+export const EARTH_GLB_URLS = [
+  "https://cdn.ashwanirathee.com/models/earth.glb",
+  "/mujoco/earth.glb",
+] as const;
 export const DRIVE_AUDIO_URL = "/mujoco/audio.mov";
 export const DRIVE_BOUNDS = 0.46;
 export const WHEEL_SPIN_RATE = 18;

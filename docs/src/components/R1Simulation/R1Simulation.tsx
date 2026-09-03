@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, type ReactNode } from "react";
 
-import { CAR_GLB_URL } from "./constants";
+import { CAR_GLB_URLS } from "./constants";
 import { createMujocoSimulation } from "./mujocoRuntime";
 import { renderCarScene } from "./renderCarScene";
 import styles from "./R1Simulation.module.css";
@@ -66,7 +66,7 @@ export function R1Simulation(): ReactNode {
       }
 
       pendingSceneHandle = await renderCarScene(
-        CAR_GLB_URL,
+        CAR_GLB_URLS,
         canvasRef.current,
         guiRef.current,
         pendingMujoco
@@ -102,7 +102,19 @@ export function R1Simulation(): ReactNode {
             <canvas
               ref={canvasRef}
               className={styles.canvas}
-              aria-label="Three.js rendering of sam_model2.glb"
+              aria-label="Three.js rendering of moon surface rover simulation with Earth in the sky"
+            />
+            <iframe
+              className={styles.spotifyEmbed}
+              data-testid="embed-iframe"
+              title="Spotify track player"
+              src="https://open.spotify.com/embed/track/0rPImnH72wOroTMvIedDC3?utm_source=generator&theme=0&si=6698aaeca21a4d3d"
+              width="100%"
+              height="152"
+              frameBorder="0"
+              allowFullScreen
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
             />
             <div ref={guiContainerRef} className={styles.guiMount} />
           </div>

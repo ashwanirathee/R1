@@ -453,10 +453,9 @@ function readNumberListAttribute(tag: string, name: string) {
     .map((value) => Number.parseFloat(value));
 }
 
-// Adds all generated sky elements: stars, Earth, and the horizon glow.
+// Adds generated sky elements. Earth is loaded from earth.glb in renderCarScene.
 function addProceduralSky(scene: THREE.Scene) {
   addStars(scene);
-  addEarth(scene);
   addHorizonGlow(scene);
 }
 

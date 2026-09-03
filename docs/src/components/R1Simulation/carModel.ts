@@ -6,9 +6,10 @@ const PHYSICS_FOOTPRINT_WIDTH = 0.15;
 const PHYSICS_FOOTPRINT_LENGTH = 0.208125;
 
 // Loads the detailed GLB and aligns it to the simplified MJCF physics proxy.
-export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
-  const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(glbUrl);
+export async function loadCarObject(
+  glbUrls: string | readonly string[]
+): Promise<THREE.Group> {
+  const gltf = await loadGltfWithFallback(glbUrls);
   const group = gltf.scene;
 
   const bounds = new THREE.Box3().setFromObject(group);
@@ -42,6 +43,23 @@ export async function loadCarObject(glbUrl: string): Promise<THREE.Group> {
   });
 
   return group;
+}
+
+export async function loadGltfWithFallback(glbUrls: string | readonly string[]) {
+  const loader = new GLTFLoader();
+  const urls = typeof glbUrls === "string" ? [glbUrls] : [...glbUrls];
+  let lastError: unknown = null;
+
+  for (const url of urls) {
+    try {
+      return await loader.loadAsync(url);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Failed to load GLB from ${url}`, error);
+    }
+  }
+
+  throw lastError ?? new Error("No GLB URLs were provided.");
 }
 
 // Spins the visual wheel meshes; MuJoCo wheel motion is handled separately.
