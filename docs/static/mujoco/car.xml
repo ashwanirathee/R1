@@ -6,7 +6,7 @@
     <texture name="lunar" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .2 .2" rgb2=".28 .28 .26"/>
     <material name="lunar" texture="lunar" texrepeat="3 3" texuniform="true" reflectance=".05"/>
     <material name="moon_rock" rgba=".36 .35 .32 1" reflectance=".08"/>
-    <hfield name="lunar_hfield" nrow="2" ncol="2" size="1.6 1.6 .07 .02"
+    <hfield name="lunar_hfield" nrow="2" ncol="2" size="10 10 .07 .02"
       elevation="0 0 0 0"/>
   </asset>
 

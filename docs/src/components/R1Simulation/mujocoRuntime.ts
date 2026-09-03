@@ -12,7 +12,7 @@ import type {
   MujocoSimulation,
 } from "./types";
 
-const OBSTACLE_COUNT = 5;
+const OBSTACLE_COUNT = 180;
 const HIDDEN_OBSTACLE_POSITION: [number, number, number] = [4, 4, 0.06];
 
 async function importRuntimeModule(url: string): Promise<MujocoRuntimeModule> {
@@ -33,7 +33,7 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
     throw new Error(`Failed to fetch car.xml: ${xmlResponse.status}`);
   }
 
-  const xml = await xmlResponse.text();
+  const xml = injectObstacleBodies(await xmlResponse.text(), OBSTACLE_COUNT);
   const { default: loadMujoco } = await importRuntimeModule(MUJOCO_MODULE_URL);
   // The JS loader asks for mujoco.wasm separately; route that request to the
   // static asset URL so browser and build paths stay predictable.
@@ -153,6 +153,22 @@ export async function createMujocoSimulation(): Promise<MujocoSimulation> {
       model.delete?.();
     },
   };
+}
+
+function injectObstacleBodies(xml: string, count: number) {
+  const obstacleBodies = Array.from({ length: count }, (_, index) => {
+    const x = HIDDEN_OBSTACLE_POSITION[0] + index * 0.2;
+    return `    <body name="obstacle_body_${index}" pos="${x} ${HIDDEN_OBSTACLE_POSITION[1]} ${HIDDEN_OBSTACLE_POSITION[2]}">
+      <geom name="obstacle_${index}" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>`;
+  }).join("\n");
+
+  return xml.replace(
+    /    <!-- Obstacle bodies[\s\S]*?    <!-- Car body z/,
+    `    <!-- Obstacle bodies are generated at load time and moved into place from TypeScript. -->
+${obstacleBodies}
+    <!-- Car body z`
+  );
 }
 
 function dampFreeJointAngularVelocity(qvel: Float64Array) {

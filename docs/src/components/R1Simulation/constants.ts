@@ -7,11 +7,11 @@ export const CAR_GLB_URLS = [
   "https://cdn.ashwanirathee.com/models/sam_model2.glb",
   "/mujoco/sam_model2.glb",
 ] as const;
-export const EARTH_GLB_URLS = [
-  "https://cdn.ashwanirathee.com/models/earth.glb",
-  "/mujoco/earth.glb",
-] as const;
 export const DRIVE_AUDIO_URL = "/mujoco/audio.mov";
+export const MAP_METERS = 20;
+export const CELLS_PER_METER = 3;
+export const MAP_CELLS = MAP_METERS * CELLS_PER_METER;
+export const PLANNING_BOUNDS = MAP_METERS / 2;
 export const DRIVE_BOUNDS = 0.46;
 export const WHEEL_SPIN_RATE = 18;
 export const INITIAL_CAMERA_POSITION = new THREE.Vector3(0.32, 0.3, -0.62);

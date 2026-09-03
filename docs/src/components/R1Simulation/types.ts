@@ -82,6 +82,12 @@ export type MujocoDataWithAccessors = MujocoData & {
 
 export type ThreeSceneHandle = {
   dispose: () => void;
+  setMapObstacles: (cells: MapEditorCell[]) => void;
+};
+
+export type MapEditorCell = {
+  row: number;
+  col: number;
 };
 
 export type GuiConstructor = typeof import("lil-gui").default;

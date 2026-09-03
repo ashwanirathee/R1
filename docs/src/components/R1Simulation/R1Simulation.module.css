@@ -36,17 +36,6 @@
   touch-action: none;
 }
 
-.spotifyEmbed {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  z-index: 2;
-  width: min(360px, calc(100% - 32px));
-  height: 152px;
-  border: 0;
-  border-radius: 12px;
-}
-
 .guiMount {
   position: absolute;
   top: 16px;
@@ -74,6 +63,167 @@
   overflow: hidden;
 }
 
+.mapEditorDialog {
+  width: min(1240px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100vh - 24px);
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  padding: 0;
+  color: #1b2533;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
+}
+
+.mapEditorDialog::backdrop {
+  background: rgb(7 9 13 / 62%);
+}
+
+.mapEditorContent {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px);
+  margin: 0;
+  padding: 0;
+}
+
+.mapEditorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.mapEditorHeader h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.mapEditorHeader p {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mapEditorToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.mapEditorToolbar dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+}
+
+.mapEditorToolbar div {
+  display: grid;
+  gap: 2px;
+}
+
+.mapEditorToolbar dt {
+  color: #667085;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.mapEditorToolbar dd {
+  margin: 0;
+  color: #1b2533;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.mapEditorButton,
+.primaryMapEditorButton {
+  min-height: 36px;
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #344054;
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryMapEditorButton {
+  border-color: #1f5d9d;
+  color: #ffffff;
+  background: #2364aa;
+}
+
+.mapViewport {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  padding: 18px 20px 20px;
+  background: #f7f9fc;
+}
+
+.mapGrid {
+  display: grid;
+  width: min(100%, 1080px);
+  aspect-ratio: 1;
+  border: 1px solid #98a6b8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #d8dee8;
+  box-shadow: 0 14px 36px rgb(30 41 59 / 14%);
+  user-select: none;
+}
+
+.mapCell,
+.mapObstacleCell {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-right: 1px solid rgb(130 146 166 / 30%);
+  border-bottom: 1px solid rgb(130 146 166 / 30%);
+  padding: 0;
+  background: #ffffff;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.mapCell:hover,
+.mapObstacleCell:hover {
+  outline: 1px solid #2364aa;
+  outline-offset: -1px;
+}
+
+.mapObstacleCell {
+  background: #263445;
+}
+
 @media screen and (max-width: 996px) {
   .viewport {
     min-height: calc(100vh - var(--ifm-navbar-height));
@@ -87,12 +237,8 @@
     width: auto;
   }
 
-  .spotifyEmbed {
-    top: 12px;
-    right: 12px;
-    bottom: auto;
-    left: 12px;
-    width: auto;
+  .mapEditorToolbar {
+    align-items: flex-start;
+    flex-direction: column;
   }
-
 }

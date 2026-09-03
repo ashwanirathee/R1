@@ -4,13 +4,13 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
   disposeMaterial,
   loadCarObject,
-  loadGltfWithFallback,
   spinWheels,
 } from "./carModel";
 import {
-  EARTH_GLB_URLS,
+  MAP_CELLS,
   INITIAL_CAMERA_POSITION,
   INITIAL_CAMERA_TARGET,
+  PLANNING_BOUNDS,
   WHEEL_SPIN_RATE,
 } from "./constants";
 import {
@@ -22,10 +22,14 @@ import {
   addMoonEnvironment,
   createMujocoCarModelDebug,
   createObstacleDebugBox,
-  createObstacleMesh,
   parseMujocoHfield,
 } from "./moonEnvironment";
-import type { GuiInstance, MujocoSimulation, ThreeSceneHandle } from "./types";
+import type {
+  GuiInstance,
+  MapEditorCell,
+  MujocoSimulation,
+  ThreeSceneHandle,
+} from "./types";
 
 const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
   // MuJoCo uses X-forward/Y-left/Z-up; Three.js scene uses X-right/Y-up/Z-back.
@@ -37,8 +41,9 @@ const MUJOCO_TO_THREE_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
   )
 );
 const THREE_TO_MUJOCO_QUATERNION = MUJOCO_TO_THREE_QUATERNION.clone().invert();
-const OBSTACLE_LIMIT = 5;
-const OBSTACLE_BOUNDS = 0.68;
+const OBSTACLE_LIMIT = 180;
+const OBSTACLE_BOUNDS = PLANNING_BOUNDS;
+const MAP_EDITOR_CELLS = MAP_CELLS;
 const EULER = new THREE.Euler(0, 0, 0, "YXZ");
 const CAMERA_MODES = ["Car view", "Follow behind"] as const;
 type CameraMode = (typeof CAMERA_MODES)[number];
@@ -48,7 +53,8 @@ export async function renderCarScene(
   glbUrl: string | readonly string[],
   canvas: HTMLCanvasElement | null,
   gui: GuiInstance | null,
-  mujoco: MujocoSimulation
+  mujoco: MujocoSimulation,
+  mapEditorDialog: HTMLDialogElement | null
 ): Promise<ThreeSceneHandle> {
   if (!canvas) {
     throw new Error("Simulation canvas is not mounted.");
@@ -65,9 +71,6 @@ export async function renderCarScene(
   const orbitControls = createOrbitControls(camera, renderer.domElement);
   // Build the visible terrain from the exact hfield encoded in the loaded MJCF.
   const environment = addMoonEnvironment(scene, parseMujocoHfield(mujoco.xml));
-  const grid = environment.grid;
-  const earth = await loadSkyEarth(EARTH_GLB_URLS);
-  scene.add(earth);
   const rawCar = await loadCarObject(glbUrl);
   const car = new THREE.Group();
   car.add(rawCar);
@@ -93,18 +96,17 @@ export async function renderCarScene(
 
   scene.add(car);
 
-  const obstacleSlots: Array<THREE.Mesh | null> = Array.from(
-    { length: OBSTACLE_LIMIT },
-    () => null
-  );
-  const obstacleDebugSlots: Array<THREE.LineSegments | null> = Array.from(
-    { length: OBSTACLE_LIMIT },
-    () => null
-  );
-  let nextObstacleIndex = 0;
+  const mapObstacleGroup = new THREE.Group();
+  mapObstacleGroup.name = "map-obstacles";
+  scene.add(mapObstacleGroup);
+  const mapObstacleDebugGroup = new THREE.Group();
+  mapObstacleDebugGroup.name = "map-obstacle-debug";
+  environment.debugGroup.add(mapObstacleDebugGroup);
+
   const debugState = {
     contacts: 0,
   };
+
   const keyState = {
     forward: false,
     backward: false,
@@ -116,23 +118,21 @@ export async function renderCarScene(
     drivePower: 1.2,
     turnPower: 0.9,
     cameraMode: "Car view" as CameraMode,
+    autoDrive: false,
     idleRotation: false,
     showGrid: true,
     showVisualCar: true,
     showVisualTerrain: true,
     showPhysicsDebug: false,
     stabilizeVisualRoll: true,
-    clickToAddRock: false,
     obstacleSize: 0.065,
     obstacleDistance: 0.34,
-    // GUI action: place a rock ahead of the rover.
-    addObstacle: () => {
-      addObstacleInFront();
+    openMapEditor: () => {
+      if (mapEditorDialog?.open) return;
+      mapEditorDialog?.showModal();
     },
-    // GUI action: clear all active rock obstacles.
-    clearObstacles: () => {
-      clearObstacles();
-    },
+
+
     // GUI action: reset MuJoCo state and immediately mirror the fresh pose.
     resetPose: () => {
       mujoco.reset();
@@ -153,6 +153,7 @@ export async function renderCarScene(
   let lastFrameTime = performance.now();
   let animationFrame = 0;
   let disposed = false;
+  let mapObstaclePositions: THREE.Vector3[] = [];
 
   // Clears remembered keyboard state when controls are disabled or reset.
   const clearKeys = () => {
@@ -218,80 +219,61 @@ export async function renderCarScene(
     orbitControls.update();
   };
 
-  // Places a new obstacle a short distance ahead of the current car heading.
-  const addObstacleInFront = () => {
-    const obstacle = createObstacleMesh(settings.obstacleSize);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(car.quaternion);
-    forward.y = 0;
 
-    if (forward.lengthSq() === 0) {
-      forward.set(0, 0, -1);
-    } else {
-      forward.normalize();
+  const syncPhysicsObstacles = () => {
+    const mapObstacleSize = getMapObstacleSize();
+    const activeObstacles = mapObstaclePositions.map((position) => ({
+      position,
+      size: [
+        mapObstacleSize * 0.5,
+        mapObstacleSize * 0.5,
+        mapObstacleSize * 0.5,
+      ] as [number, number, number],
+    }));
+
+    for (let index = 0; index < OBSTACLE_LIMIT; index += 1) {
+      const obstacle = activeObstacles[index];
+      mujoco.setObstacle(
+        index,
+        obstacle
+          ? {
+            position: [-obstacle.position.z, -obstacle.position.x, obstacle.position.y],
+            size: obstacle.size,
+          }
+          : null
+      );
+    }
+  };
+
+  const setMapObstacles = (cells: MapEditorCell[]) => {
+    disposeGroupChildren(mapObstacleGroup);
+    mapObstaclePositions = cells.map((cell) =>
+      mapEditorCellToWorld(cell, environment.getSurfaceHeight)
+    );
+
+    const mapObstacleMesh = createMapObstacleMesh(mapObstaclePositions);
+    if (mapObstacleMesh) {
+      mapObstacleGroup.add(mapObstacleMesh);
     }
 
-    const position = car.position
-      .clone()
-      .addScaledVector(forward, settings.obstacleDistance);
-    placeObstacle(obstacle, position);
+    syncPhysicsObstacles();
+    rebuildObstacleDebugOverlay();
   };
 
-  // Adds or replaces one visual rock and syncs the matching MuJoCo obstacle.
-  const placeObstacle = (obstacle: THREE.Mesh, position: THREE.Vector3) => {
-    // Clamp to the finite hfield patch; MuJoCo collision only exists inside
-    // the current lunar_hfield bounds.
-    position.x = THREE.MathUtils.clamp(position.x, -OBSTACLE_BOUNDS, OBSTACLE_BOUNDS);
-    position.z = THREE.MathUtils.clamp(position.z, -OBSTACLE_BOUNDS, OBSTACLE_BOUNDS);
-    position.y =
-      environment.getSurfaceHeight(position.x, position.z) +
-      settings.obstacleSize * 0.58;
-    obstacle.position.copy(position);
-    obstacle.rotation.set(
-      Math.random() * Math.PI,
-      Math.random() * Math.PI,
-      Math.random() * Math.PI
-    );
-    obstacle.updateMatrixWorld();
+  const rebuildObstacleDebugOverlay = () => {
+    disposeGroupChildren(mapObstacleDebugGroup);
 
-    obstacleSlots[nextObstacleIndex]?.removeFromParent();
-    obstacleSlots[nextObstacleIndex]?.geometry.dispose();
-    disposeMaterial(obstacleSlots[nextObstacleIndex]?.material ?? []);
-    obstacleDebugSlots[nextObstacleIndex]?.removeFromParent();
-    obstacleDebugSlots[nextObstacleIndex]?.geometry.dispose();
-    disposeMaterial(obstacleDebugSlots[nextObstacleIndex]?.material ?? []);
+    if (!settings.showPhysicsDebug) return;
 
-    const debugBox = createObstacleDebugBox(settings.obstacleSize);
-    debugBox.position.copy(position);
-    obstacleSlots[nextObstacleIndex] = obstacle;
-    obstacleDebugSlots[nextObstacleIndex] = debugBox;
-    environment.obstacleGroup.add(obstacle);
-    environment.debugGroup.add(debugBox);
-    // Mirror the visual obstacle into one of the predeclared MuJoCo bodies.
-    mujoco.setObstacle(nextObstacleIndex, {
-      position: [-position.z, -position.x, position.y],
-      size: [
-        settings.obstacleSize * 0.72,
-        settings.obstacleSize * 0.72,
-        settings.obstacleSize * 0.58,
-      ],
-    });
-    nextObstacleIndex = (nextObstacleIndex + 1) % OBSTACLE_LIMIT;
-  };
+    const obstacleSize = getMapObstacleSize();
+    mapObstaclePositions
+      .slice(0, OBSTACLE_LIMIT)
+      .forEach((position) => {
+        const debugBox = createObstacleDebugBox(obstacleSize);
 
-  // Removes all visual rocks and parks their MuJoCo obstacle bodies off-field.
-  const clearObstacles = () => {
-    obstacleSlots.forEach((obstacle, index) => {
-      obstacle?.removeFromParent();
-      obstacle?.geometry.dispose();
-      disposeMaterial(obstacle?.material ?? []);
-      obstacleDebugSlots[index]?.removeFromParent();
-      obstacleDebugSlots[index]?.geometry.dispose();
-      disposeMaterial(obstacleDebugSlots[index]?.material ?? []);
-      obstacleSlots[index] = null;
-      obstacleDebugSlots[index] = null;
-      mujoco.setObstacle(index, null);
-    });
-    nextObstacleIndex = 0;
+        debugBox.position.copy(position);
+        mapObstacleDebugGroup.add(debugBox);
+      });
   };
 
   // Avoids hijacking keyboard input while the user is editing GUI fields.
@@ -338,9 +320,9 @@ export async function renderCarScene(
   const keyDown = (event: KeyboardEvent) => updateKey(event, true);
   // Marks a drive key as released.
   const keyUp = (event: KeyboardEvent) => updateKey(event, false);
-  // Raycasts into the terrain to place a rock where the user clicks.
+  // Raycasts into the terrain to edit the planner goal or obstacle field.
   const pointerDown = (event: PointerEvent) => {
-    if (!settings.clickToAddRock || event.button !== 0) return;
+    if (event.button !== 0) return;
 
     const target = event.target;
     if (target !== canvas) return;
@@ -354,7 +336,6 @@ export async function renderCarScene(
     if (!hit) return;
 
     event.preventDefault();
-    placeObstacle(createObstacleMesh(settings.obstacleSize), hit.point.clone());
   };
 
   // Keeps renderer and camera projection matched to the canvas size.
@@ -450,43 +431,13 @@ export async function renderCarScene(
         updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       }
     });
+
+  controlsFolder?.add(settings, "openMapEditor").name("Map editor");
+
   controlsFolder?.add(settings, "drivePower", 0.05, 2, 0.01).name("Drive power");
   controlsFolder?.add(settings, "turnPower", 0.05, 2, 0.01).name("Turn power");
-  controlsFolder?.add(settings, "idleRotation").name("Idle rotation");
-  controlsFolder
-    ?.add(settings, "showGrid")
-    .name("Show grid")
-    .onChange((visible: boolean) => {
-      grid.visible = visible;
-    });
-  controlsFolder
-    ?.add(settings, "showVisualCar")
-    .name("Visual car")
-    .onChange((visible: boolean) => {
-      rawCar.visible = visible;
-    });
-  controlsFolder
-    ?.add(settings, "showVisualTerrain")
-    .name("Visual terrain")
-    .onChange((visible: boolean) => {
-      environment.terrain.visible = visible;
-    });
-  controlsFolder
-    ?.add(settings, "stabilizeVisualRoll")
-    .name("Stabilize roll");
-  controlsFolder?.add(settings, "resetPose").name("Reset pose");
-  controlsFolder?.add(settings, "resetCamera").name("Reset camera");
 
-  const obstacleFolder = gui?.addFolder("Obstacles");
-  obstacleFolder
-    ?.add(settings, "obstacleSize", 0.03, 0.12, 0.005)
-    .name("Rock size");
-  obstacleFolder
-    ?.add(settings, "obstacleDistance", 0.18, 0.58, 0.01)
-    .name("Place distance");
-  obstacleFolder?.add(settings, "clickToAddRock").name("Click to add");
-  obstacleFolder?.add(settings, "addObstacle").name("Add obstacle");
-  obstacleFolder?.add(settings, "clearObstacles").name("Clear obstacles");
+
 
   const debugFolder = gui?.addFolder("Debug");
   debugFolder
@@ -494,6 +445,7 @@ export async function renderCarScene(
     .name("Show MJCF model")
     .onChange((visible: boolean) => {
       environment.debugGroup.visible = visible;
+      rebuildObstacleDebugOverlay();
       if (!visible) {
         debugState.contacts = 0;
       }
@@ -513,12 +465,11 @@ export async function renderCarScene(
       window.removeEventListener("keyup", keyUp);
       canvas.removeEventListener("pointerdown", pointerDown);
       mujoco.setControls(0, 0);
-      clearObstacles();
+      setMapObstacles([]);
       updateMotorSound(motorSound, motorAudioState, 0, 0, false);
       audioListener.context.close().catch(() => undefined);
       orbitControls.dispose();
       controlsFolder?.destroy();
-      obstacleFolder?.destroy();
       debugFolder?.destroy();
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
@@ -528,69 +479,69 @@ export async function renderCarScene(
       });
       renderer.dispose();
     },
+    setMapObstacles,
   };
 }
 
-async function loadSkyEarth(glbUrl: string | readonly string[]) {
-  const gltf = await loadGltfWithFallback(glbUrl);
-  const earth = gltf.scene;
+function createMapObstacleMesh(positions: THREE.Vector3[]) {
+  if (positions.length === 0) return null;
 
-  const bounds = new THREE.Box3().setFromObject(earth);
-  const size = bounds.getSize(new THREE.Vector3());
-  const center = bounds.getCenter(new THREE.Vector3());
-  earth.position.sub(center);
-
-  const largestSide = Math.max(size.x, size.y, size.z);
-  if (Number.isFinite(largestSide) && largestSide > 0) {
-    earth.scale.multiplyScalar(14 / largestSide);
-  }
-
-  earth.position.set(-1.35, -2.75, -8.5);
-  earth.rotation.set(-0.131592653589793, 0.898407346410207, 0);
-  earth.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.castShadow = false;
-      object.receiveShadow = false;
-      object.renderOrder = 0;
-      const materials = Array.isArray(object.material)
-        ? object.material
-        : [object.material];
-      const brightMaterials = materials.map((material) => createBrightEarthMaterial(material));
-      object.material = Array.isArray(object.material)
-        ? brightMaterials
-        : brightMaterials[0];
-    }
+  const obstacleSize = getMapObstacleSize();
+  const geometry = new THREE.BoxGeometry(
+    obstacleSize,
+    obstacleSize,
+    obstacleSize
+  );
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x303844,
+    roughness: 0.92,
+    metalness: 0,
   });
+  const mesh = new THREE.InstancedMesh(geometry, material, positions.length);
+  const matrix = new THREE.Matrix4();
 
-  return earth;
+  positions.forEach((position, index) => {
+    matrix.makeTranslation(position.x, position.y, position.z);
+    mesh.setMatrixAt(index, matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  return mesh;
 }
 
-function createBrightEarthMaterial(material: THREE.Material) {
-  const source = material as THREE.MeshStandardMaterial;
-  const texture = source.map ?? source.emissiveMap ?? null;
-  if (texture) {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-  }
+function mapEditorCellToWorld(
+  cell: MapEditorCell,
+  getSurfaceHeight: (x: number, z: number) => number
+) {
+  const obstacleSize = getMapObstacleSize();
+  const x =
+    -OBSTACLE_BOUNDS +
+    ((cell.col + 0.5) / MAP_EDITOR_CELLS) * OBSTACLE_BOUNDS * 2;
+  const z =
+    -OBSTACLE_BOUNDS +
+    ((cell.row + 0.5) / MAP_EDITOR_CELLS) * OBSTACLE_BOUNDS * 2;
 
-  const isInvisibleOverlay = source.transparent && source.opacity <= 0.01;
-  const brightMaterial = new THREE.MeshBasicMaterial({
-    color: isInvisibleOverlay ? 0xffffff : new THREE.Color(1.65, 1.65, 1.65),
-    map: texture,
-    transparent: source.transparent,
-    opacity: isInvisibleOverlay ? 0 : source.opacity,
-    side: source.side,
-    depthTest: true,
-    depthWrite: !source.transparent,
-    fog: false,
-    toneMapped: false,
+  return new THREE.Vector3(
+    x,
+    getSurfaceHeight(x, z) + obstacleSize * 0.5,
+    z
+  );
+}
+
+function getMapObstacleSize() {
+  return (OBSTACLE_BOUNDS * 2) / MAP_EDITOR_CELLS;
+}
+
+function disposeGroupChildren(group: THREE.Group) {
+  group.children.forEach((child) => {
+    if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+      child.geometry.dispose();
+      disposeMaterial(child.material);
+    }
   });
-
-  if (source.name) {
-    brightMaterial.name = `${source.name}-bright`;
-  }
-
-  return brightMaterial;
+  group.clear();
 }
 
 // Creates the WebGL renderer with tone mapping and shadows enabled.
@@ -613,13 +564,13 @@ function createRenderer(canvas: HTMLCanvasElement) {
 // Creates the base Three.js scene and fog used by the moon environment.
 function createScene() {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x07090d, 1.4, 4.2);
+  scene.fog = new THREE.Fog(0x07090d, 14, 36);
   return scene;
 }
 
 // Creates the perspective camera at the default simulation viewpoint.
 function createCamera() {
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 10);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 60);
   camera.position.copy(INITIAL_CAMERA_POSITION);
   camera.lookAt(INITIAL_CAMERA_TARGET);
   return camera;
@@ -636,7 +587,7 @@ function createOrbitControls(
   orbitControls.dampingFactor = 0.08;
   orbitControls.screenSpacePanning = true;
   orbitControls.minDistance = 0.12;
-  orbitControls.maxDistance = 2.5;
+  orbitControls.maxDistance = 24;
   orbitControls.update();
   return orbitControls;
 }
