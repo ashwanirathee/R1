@@ -2,24 +2,20 @@
   <compiler autolimits="true"/>
 
   <asset>
-    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
-    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <mesh name="chasis" scale=".01 .006 .0015"
-      vertex=" 9   2   0
-              -10  10  10
-               9  -2   0
-               10  3  -10
-               10 -3  -10
-              -8   10 -10
-              -10 -10  10
-              -8  -10 -10
-              -5   0   20"/>
+    <!-- Flat hfield for the current baseline: MuJoCo sees a level lunar plane. -->
+    <texture name="lunar" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .2 .2" rgb2=".28 .28 .26"/>
+    <material name="lunar" texture="lunar" texrepeat="3 3" texuniform="true" reflectance=".05"/>
+    <material name="moon_rock" rgba=".36 .35 .32 1" reflectance=".08"/>
+    <hfield name="lunar_hfield" nrow="2" ncol="2" size="10 10 .07 .02"
+      elevation="0 0 0 0"/>
   </asset>
 
   <default>
-    <joint damping=".03" actuatorfrcrange="-0.5 0.5"/>
+    <joint damping=".025" actuatorfrcrange="-4 4"/>
+    <geom condim="3" friction="1.2 .08 .02" solref=".004 1" solimp=".95 .99 .001"/>
     <default class="wheel">
-      <geom type="cylinder" size=".03 .01" rgba=".5 .5 1 1"/>
+      <!-- Wheel size is radius, half-width. Friction keeps forward grip high while allowing skid-turning. -->
+      <geom type="cylinder" size=".030375 .010125" rgba=".5 .5 1 1" condim="4" friction="1.4 .05 .01" priority="1" solref=".002 1" solimp=".97 .995 .001"/>
     </default>
     <default class="decor">
       <site type="box" rgba=".5 1 .5 1"/>
@@ -27,21 +23,51 @@
   </default>
 
   <worldbody>
-    <geom type="plane" size="3 3 .01" material="grid"/>
-    <body name="car" pos="0 0 .03">
+    <geom name="lunar ground" type="hfield" hfield="lunar_hfield" material="lunar"/>
+    <!-- Obstacle bodies are parked off-field and moved into place from TypeScript when rocks are added. -->
+    <body name="obstacle_body_0" pos="4 4 .06">
+      <geom name="obstacle_0" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>
+    <body name="obstacle_body_1" pos="4.2 4 .06">
+      <geom name="obstacle_1" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>
+    <body name="obstacle_body_2" pos="4.4 4 .06">
+      <geom name="obstacle_2" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>
+    <body name="obstacle_body_3" pos="4.6 4 .06">
+      <geom name="obstacle_3" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>
+    <body name="obstacle_body_4" pos="4.8 4 .06">
+      <geom name="obstacle_4" type="box" size=".08 .08 .06" material="moon_rock" contype="1" conaffinity="1"/>
+    </body>
+    <!-- Car body z is chosen so the wheels start just above the flat hfield. -->
+    <body name="car" pos="0 0 .035">
       <freejoint/>
       <light name="top light" pos="0 0 2" mode="trackcom" diffuse=".4 .4 .4"/>
-      <geom name="chasis" type="mesh" mesh="chasis"/>
-      <geom name="front wheel" pos=".08 0 -.015" type="sphere" size=".015" condim="1" priority="1"/>
-      <light name="front light" pos=".1 0 .02" dir="2 0 -1" diffuse="1 1 1"/>
-      <body name="left wheel" pos="-.07 .06 0" zaxis="0 1 0">
-        <joint name="left"/>
+      <!-- Chassis is a simplified collision/debug cuboid. Pos is its local center; size is half-extents. -->
+      <geom name="chassis" type="box" pos="-.0028125 0 .047" size=".1040625 .075 .042"/>
+      <light name="front light" pos=".09 0 .02" dir="2 0 -1" diffuse="1 1 1"/>
+      <!-- Wheels use MuJoCo X for front/back and Y for left/right spacing. -->
+      <body name="front left wheel" pos=".04455 .0675 0" zaxis="0 1 0">
+        <joint name="front_left"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
         <site class="decor" size=".025 .006 .012"/>
       </body>
-      <body name="right wheel" pos="-.07 -.06 0" zaxis="0 1 0">
-        <joint name="right"/>
+      <body name="front right wheel" pos=".04455 -.0675 0" zaxis="0 1 0">
+        <joint name="front_right"/>
+        <geom class="wheel"/>
+        <site class="decor" size=".006 .025 .012"/>
+        <site class="decor" size=".025 .006 .012"/>
+      </body>
+      <body name="rear left wheel" pos="-.0495 .0675 0" zaxis="0 1 0">
+        <joint name="rear_left"/>
+        <geom class="wheel"/>
+        <site class="decor" size=".006 .025 .012"/>
+        <site class="decor" size=".025 .006 .012"/>
+      </body>
+      <body name="rear right wheel" pos="-.0495 -.0675 0" zaxis="0 1 0">
+        <joint name="rear_right"/>
         <geom class="wheel"/>
         <site class="decor" size=".006 .025 .012"/>
         <site class="decor" size=".025 .006 .012"/>
@@ -50,13 +76,18 @@
   </worldbody>
 
   <tendon>
+    <!-- Tendons combine four wheel joints into simple forward and differential-turn controls. -->
     <fixed name="forward">
-      <joint joint="left" coef=".5"/>
-      <joint joint="right" coef=".5"/>
+      <joint joint="front_left" coef=".25"/>
+      <joint joint="front_right" coef=".25"/>
+      <joint joint="rear_left" coef=".25"/>
+      <joint joint="rear_right" coef=".25"/>
     </fixed>
     <fixed name="turn">
-      <joint joint="left" coef="-.5"/>
-      <joint joint="right" coef=".5"/>
+      <joint joint="front_left" coef="-.25"/>
+      <joint joint="rear_left" coef="-.25"/>
+      <joint joint="front_right" coef=".25"/>
+      <joint joint="rear_right" coef=".25"/>
     </fixed>
   </tendon>
 
@@ -66,7 +97,9 @@
   </actuator>
 
   <sensor>
-    <jointactuatorfrc name="right" joint="right"/>
-    <jointactuatorfrc name="left" joint="left"/>
+    <jointactuatorfrc name="front_right" joint="front_right"/>
+    <jointactuatorfrc name="front_left" joint="front_left"/>
+    <jointactuatorfrc name="rear_right" joint="rear_right"/>
+    <jointactuatorfrc name="rear_left" joint="rear_left"/>
   </sensor>
 </mujoco>
