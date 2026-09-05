@@ -43,6 +43,7 @@ RUN python3 -m pip install --break-system-packages --ignore-installed --no-cache
     python-dateutil \
     onnx \
     onnxruntime \
+    lap \
     adafruit-blinka \
     adafruit-extended-bus \
     adafruit-circuitpython-bno08x

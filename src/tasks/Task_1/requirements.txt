@@ -10,3 +10,4 @@ mcap
 mcap-ros2-support
 rosbags
 opencv-python
+lap

@@ -41,6 +41,8 @@ def generate_launch_description():
         ["'", enable_2dobd, "' == 'true' or '", enable_3dobd, "' == 'true'"]
     )
 
+    enable_task_1_tracking = LaunchConfiguration("enable_task_1_tracking")
+    task_1_output_mode = LaunchConfiguration("task_1_output_mode")
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -112,6 +114,16 @@ def generate_launch_description():
                 "detector_camera_uid",
                 default_value="10",
                 description="Camera uid whose image stream should be used by detector_node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_task_1_tracking",
+                default_value="false",
+                description="Enable object tracking in detector_node for task_1.",
+            ),
+            DeclareLaunchArgument(
+                "task_1_output_mode",
+                default_value="events",
+                description="Detector output mode: events, overlay, or both.",
             ),
             DeclareLaunchArgument(
                 "enable_sampler",
@@ -310,7 +322,13 @@ def generate_launch_description():
                 executable="detector_node",
                 name="detector_node",
                 output="screen",
-                parameters=[{"camera_uid": detector_camera_uid}],
+                parameters=[
+                    {
+                        "camera_uid": detector_camera_uid,
+                        "enable_task_1_tracking": enable_task_1_tracking,
+                        "task_1_output_mode": task_1_output_mode,
+                    }
+                ],
                 condition=IfCondition(enable_detector),
             ),
             Node(

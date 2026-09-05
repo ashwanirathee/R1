@@ -6,7 +6,7 @@ R1 is a Raspberry Pi 5-based Physical AI robot platform for experiments in robot
   <img src="assets/logo.jpg" width="500" alt="R1 logo">
 </p>
 
-#### Goals
+## Goals
 
 R1 is designed as a small, always-on research platform for testing embodied AI systems on real hardware. The platform focuses on:
 
@@ -16,25 +16,30 @@ R1 is designed as a small, always-on research platform for testing embodied AI s
 - Observability: live monitoring through Foxglove, Prometheus, and Grafana
 - Remote compute: offloading heavier AI workloads to a compute server when needed
 
-The theory is mentioned here: projectnode1.github.io which is a comprehensive resource for understanding the underlying concepts.
-This repository doesn't focus on writing out the concepts but more about implementing and running the R1 platform.
+The project theory is documented at https://projectnode1.github.io. This
+repository focuses on implementing and running the R1 platform.
 
-### Setup Instructions:
+## Setup
 
 ### ROS Instructions
-```
-# base setup
+
+```bash
 cd /home/ubuntu/r1
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
-# to build
 colcon build --symlink-install
+```
 
-# to delete current build
+To remove build artifacts:
+
+```bash
 rm -rf build install log
+```
 
-# launch the nodes based bringup file
+Launch the full bringup stack with the task 1 detector enabled:
+
+```bash
 ros2 launch r1 bringup.launch.py \
   event_min_interval_sec:=5.0 \
   event_max_silence_sec:=5.0 \
@@ -48,28 +53,80 @@ ros2 launch r1 bringup.launch.py \
   enable_vlm:=false \
   enable_2dobd:=false \
   enable_3dobd:=false \
-  enable_detector:=false \
+  enable_detector:=true \
   enable_sampler:=false \
   enable_wheels:=true \
   enable_ptz:=false \
   enable_sensors:=true \
-  gpio_chip:=4
+  gpio_chip:=4 \
+  enable_task_1_tracking:=true \
+  task_1_output_mode:="both"
+```
 
-# to launch foxglove_bridge
+Run Foxglove bridge:
+
+```bash
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+```
 
-# to run individual nodes
+Run an individual node:
+
+```bash
 ros2 run r1 node_name
 ```
 
-### Docker Instructions
+### Docker Compose
+
+Compose is the preferred way to start the ROS container because it keeps the
+device mappings, ports, user IDs, and host mounts in one file.
+
+Set host-specific IDs once per shell, or copy `.env.example` to `.env` and edit
+the values:
+
+```bash
+export HOST_UID="$(id -u)"
+export HOST_GID="$(id -g)"
+export GPIO_GID="$(getent group gpio | cut -d: -f3)"
+export I2C_GID="$(stat -c '%g' /dev/i2c-1)"
 ```
-# build docker container
-docker build -t r1-ros .
 
-# run the container
+Build the image:
+
+```bash
+docker compose build
+```
+
+Start the container in the background:
+
+```bash
+docker compose up -d r1-ros
+```
+
+Enter the running container from any terminal:
+
+```bash
+docker compose exec r1-ros bash
+```
+
+Stop and remove the Compose container:
+
+```bash
+docker compose down
+```
+
+For quick one-off commands:
+
+```bash
 docker run --rm r1-ros date
+docker compose run --rm r1-ros date
+```
 
+### Raw Docker
+
+Use this only when Compose is not available:
+
+```bash
+docker build -t r1-ros .
 docker run -it --rm \
   --name r1-ros \
   --user $(id -u):$(id -g) \
@@ -85,42 +142,24 @@ docker run -it --rm \
   -p 8002:8002 \
   -v /home/murphy/Documents/r1:/home/ubuntu/r1 \
   r1-ros:latest
-
-# to enter already running docker container  
-docker exec -it r1-ros bash
-
-# remove the container
-docker rmi r1-ros
 ```
 
 The wheel and PTZ controllers need `gpiozero` and GPIO device access. The Docker
-command above exposes the `gpiochip` interface used on newer Raspberry Pi
-systems. If your host also has `/dev/gpiomem`, you can add
-`--device /dev/gpiomem:/dev/gpiomem`, but it is optional and should be omitted
-when that device file does not exist. After changing the image or command,
-rebuild, recreate the container, and source `install/setup.bash` before
-launching. If the GPIO pins are exposed through `/dev/gpiochip4`, also pass
-`--device /dev/gpiochip4:/dev/gpiochip4` and launch with `gpio_chip:=4`.
-The Teleop panel reports the action-node execution result, so a
-`200` response no longer looks like a motor success.
+and Compose examples expose `/dev/gpiochip0`, `/dev/gpiochip4`, `/dev/video10`,
+and `/dev/i2c-1`. If GPIO pins are exposed through `/dev/gpiochip4`, launch with
+`gpio_chip:=4`.
 
-The BNO08X IMU additionally needs the host I2C bus. When the sensor is
-connected on `/dev/i2c-1`, add these Docker flags:
+After changing the image or command, rebuild, recreate the container, and source
+`install/setup.bash` before launching.
 
-```
-  --device /dev/i2c-1:/dev/i2c-1 \
-  --group-add $(stat -c '%g' /dev/i2c-1) \
-```
+## Node Notes
 
-### Specific Nodes behaviors:
+### Audio Node and Bluetooth Bridge
 
-##### Audio Node and its bluetooth bridge:
-```
-# audio control
+```bash
 pactl list short sinks
 pactl set-sink-volume bluez_output.41_42_12_84_8B_60.1 40%
 
-# audio bridge controlling the bluetooth speaker from the host machine
 chmod +x speaker_bridge.sh
 apt update
 apt install -y espeak alsa-utils
@@ -131,8 +170,10 @@ ros2 topic pub --once /audio/heard_text std_msgs/msg/String "{data: 'how many ca
 # run the speaker bridge in the host machine to forward audio from ROS to the bluetooth speaker
 /home/murphy/Documents/r1/src/speaker_bridge.sh
 ```
-##### Camera Node access
-```
+
+### Camera Node Access
+
+```bash
 sudo apt install v4l2loopback-dkms v4l2loopback-utils ffmpeg
 
 sudo modprobe v4l2loopback \
@@ -161,27 +202,30 @@ rpicam-vid \
 
 ```
 
-##### VLM Node:
+### VLM Node
 
-```
+```bash
 ollama run moondream # on the host
 ollama serve
 ```
 
-#### Foxglove Visualization
-```
+### Foxglove Visualization
+
+```bash
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 
-#### R1 Compute Server
+## R1 Compute Server
 
-There is need for a remote server that handle computational loads for R1 that are bigger than what the R1 can handle locally.
+R1 can use a remote compute server for workloads that are too large for the
+robot to handle locally.
 
-#### R1 System Monitor
+## R1 System Monitor
 
-We setup Grafana and Prometheus to monitor the system. It allows us to visualize the system's performance and identify potential issues. 
+Grafana and Prometheus can be used to monitor system performance and identify
+runtime issues.
 
-### References:
+## References
 - ROS 2 documentation: https://docs.ros.org/
 - https://github.com/apple/ml-cubifyanything
 - https://arxiv.org/abs/2005.14165
