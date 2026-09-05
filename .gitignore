@@ -42,3 +42,7 @@ postman
 
 src/llm/scripts/results/promptfoo-results.html
 src/llm/scripts/results/promptfoo-results.json
+
+flywheel
+
+*.pt

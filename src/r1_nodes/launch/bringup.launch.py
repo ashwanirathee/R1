@@ -16,11 +16,22 @@ def generate_launch_description():
     enable_3dobd = LaunchConfiguration("enable_3dobd")
     yolo_camera_uid = LaunchConfiguration("yolo_camera_uid")
     enable_ear = LaunchConfiguration("enable_ear")
+    enable_detector = LaunchConfiguration("enable_detector")
+    detector_camera_uid = LaunchConfiguration("detector_camera_uid")
+    enable_sampler = LaunchConfiguration("enable_sampler")
+    sampler_camera_uid = LaunchConfiguration("sampler_camera_uid")
+    sampler_save_dir = LaunchConfiguration("sampler_save_dir")
     enable_vlm = LaunchConfiguration("enable_vlm")
     enable_slam = LaunchConfiguration("enable_slam")
     enable_web = LaunchConfiguration("enable_web")
+    enable_sensors = LaunchConfiguration("enable_sensors")
+    enable_wheels = LaunchConfiguration("enable_wheels")
+    enable_ptz = LaunchConfiguration("enable_ptz")
+    gpio_chip = LaunchConfiguration("gpio_chip")
     event_min_interval_sec = LaunchConfiguration("event_min_interval_sec")
     event_max_silence_sec = LaunchConfiguration("event_max_silence_sec")
+    imu_update_interval_sec = LaunchConfiguration("imu_update_interval_sec")
+    sensor_publish_interval_sec = LaunchConfiguration("sensor_publish_interval_sec")
     slam_camera_topic = LaunchConfiguration("slam_camera_topic")
     slam_focal_length = LaunchConfiguration("slam_focal_length")
     slam_principal_point_x = LaunchConfiguration("slam_principal_point_x")
@@ -30,6 +41,8 @@ def generate_launch_description():
         ["'", enable_2dobd, "' == 'true' or '", enable_3dobd, "' == 'true'"]
     )
 
+    enable_task_1_tracking = LaunchConfiguration("enable_task_1_tracking")
+    task_1_output_mode = LaunchConfiguration("task_1_output_mode")
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -93,6 +106,41 @@ def generate_launch_description():
                 description="Start ear_node for terminal text input.",
             ),
             DeclareLaunchArgument(
+                "enable_detector",
+                default_value="false",
+                description="Start detector_node for object detection.",
+            ),
+            DeclareLaunchArgument(
+                "detector_camera_uid",
+                default_value="10",
+                description="Camera uid whose image stream should be used by detector_node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_task_1_tracking",
+                default_value="false",
+                description="Enable object tracking in detector_node for task_1.",
+            ),
+            DeclareLaunchArgument(
+                "task_1_output_mode",
+                default_value="events",
+                description="Detector output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "enable_sampler",
+                default_value="false",
+                description="Start sampler_node for detector event sampling.",
+            ),
+            DeclareLaunchArgument(
+                "sampler_camera_uid",
+                default_value="10",
+                description="Camera uid whose detector events should be sampled.",
+            ),
+            DeclareLaunchArgument(
+                "sampler_save_dir",
+                default_value="./flywheel/raw",
+                description="Directory where sampler_node saves sampled images and metadata.",
+            ),
+            DeclareLaunchArgument(
                 "enable_vlm",
                 default_value="true",
                 description="Start vlm_node for image question answering.",
@@ -106,6 +154,36 @@ def generate_launch_description():
                 "enable_web",
                 default_value="true",
                 description="Start the web dashboard node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_sensors",
+                default_value="true",
+                description="Start sensor_node for onboard sensor telemetry.",
+            ),
+            DeclareLaunchArgument(
+                "enable_wheels",
+                default_value="false",
+                description="Allow action_node to access wheel hardware.",
+            ),
+            DeclareLaunchArgument(
+                "enable_ptz",
+                default_value="false",
+                description="Allow action_node to access PTZ hardware.",
+            ),
+            DeclareLaunchArgument(
+                "gpio_chip",
+                default_value="0",
+                description="GPIO character device number used by wheel and PTZ hardware.",
+            ),
+            DeclareLaunchArgument(
+                "imu_update_interval_sec",
+                default_value="0.5",
+                description="Polling interval for IMU hardware access.",
+            ),
+            DeclareLaunchArgument(
+                "sensor_publish_interval_sec",
+                default_value="0.5",
+                description="Publish interval for sensor telemetry topics.",
             ),
             DeclareLaunchArgument(
                 "slam_camera_topic",
@@ -181,6 +259,27 @@ def generate_launch_description():
                 executable="action_node",
                 name="action_node",
                 output="screen",
+                parameters=[
+                    {
+                        "enable_wheels": enable_wheels,
+                        "enable_ptz": enable_ptz,
+                        "gpio_chip": gpio_chip,
+                    }
+                ],
+            ),
+            Node(
+                package="r1",
+                executable="sensor_node",
+                name="sensor_node",
+                output="screen",
+                parameters=[
+                    {
+                        "enable_imu": enable_sensors,
+                        "imu_update_interval_sec": imu_update_interval_sec,
+                        "publish_interval_sec": sensor_publish_interval_sec,
+                    }
+                ],
+                condition=IfCondition(enable_sensors),
             ),
             Node(
                 package="r1",
@@ -217,6 +316,33 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(enable_vlm),
+            ),
+             Node(
+                package="r1",
+                executable="detector_node",
+                name="detector_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": detector_camera_uid,
+                        "enable_task_1_tracking": enable_task_1_tracking,
+                        "task_1_output_mode": task_1_output_mode,
+                    }
+                ],
+                condition=IfCondition(enable_detector),
+            ),
+            Node(
+                package="r1",
+                executable="sampler_node",
+                name="sampler_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": sampler_camera_uid,
+                        "save_dir": sampler_save_dir,
+                    }
+                ],
+                condition=IfCondition(enable_sampler),
             ),
             Node(
                 package="r1_web",

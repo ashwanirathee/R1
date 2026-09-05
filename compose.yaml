@@ -1,0 +1,29 @@
+services:
+  r1-ros:
+    build:
+      context: .
+    image: r1-ros:latest
+    container_name: r1-ros
+    stdin_open: true
+    tty: true
+    working_dir: /home/ubuntu/r1
+    command: /bin/bash
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    group_add:
+      - video
+      - "${GPIO_GID:-997}"
+      - "${I2C_GID:-998}"
+    devices:
+      - /dev/gpiochip0:/dev/gpiochip0
+      - /dev/gpiochip4:/dev/gpiochip4
+      - /dev/video10:/dev/video10
+      - /dev/i2c-1:/dev/i2c-1
+    ports:
+      - "8765:8765"
+      - "8002:8002"
+    environment:
+      YOLO_CONFIG_DIR: /tmp/Ultralytics
+    volumes:
+      - .:/home/ubuntu/r1
