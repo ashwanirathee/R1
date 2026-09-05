@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
+import KicanvasSchematic from '../components/KicanvasSchematic';
 import styles from './index.module.css';
 
 const goals = [
@@ -131,24 +132,26 @@ export default function Home(): ReactNode {
 
         <Section id="hardware" title="Hardware">
           <p>
-            The current platform is based around a Raspberry Pi 5 running the R1
-            ROS workspace. It is designed to work with camera devices, a
-            Bluetooth speaker bridge, optional web services, and external compute
-            when larger vision-language models are too heavy for the robot.
+            Hardware includes Raspberry Pi 5 as primary compute device with peripherals like
+            2 L298N motor drivers which controls 4 DC Motors, 2 servo controlled via GPIOs 
+            on board Pi, IMX477 Camera and BN0085 IMU unit. Wiring schematic is shown below.
           </p>
           <div className={styles.calloutGrid}>
             <div>
               <strong>Compute</strong>
-              <span>Raspberry Pi 5 on the robot, with optional remote server offload.</span>
+              <span>Raspberry Pi 5 with optional remote server</span>
             </div>
             <div>
               <strong>Sensing</strong>
-              <span>Camera input today, with stereo and TOF cameras on the roadmap.</span>
+              <span>IMX477 Camera and BN0085 IMU</span>
             </div>
             <div>
-              <strong>Audio</strong>
-              <span>ROS audio topics plus a host-side Bluetooth speaker bridge.</span>
+              <strong>Motor Drivers and Motors</strong>
+              <span>L298N Motor Drivers, DC and Servo Motors</span>
             </div>
+          </div>
+          <div className={styles.schematicBlock}>
+            <KicanvasSchematic />
           </div>
         </Section>
 

@@ -43,6 +43,29 @@ postman
 src/llm/scripts/results/promptfoo-results.html
 src/llm/scripts/results/promptfoo-results.json
 
+
+# KiCad lock/temp files
+*.lck
+~*.lck
+*.bak
+*.tmp
+*-backups/
+fp-info-cache
+
+# KiCad generated manufacturing/export files
+*.net
+*.xml
+*.pos
+*.gbr
+*.drl
+*.step
+*.stp
+*.wrl
+
+# KiCad autosave/history
+.history/
+
+hardware/r1-control/kicad/schematics/*
 flywheel
 
 *.pt

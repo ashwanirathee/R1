@@ -121,6 +121,14 @@
   margin-bottom: 0.35rem;
 }
 
+.schematicBlock {
+  margin-top: 2rem;
+}
+
+.schematicBlock h3 {
+  margin-bottom: 0.6rem;
+}
+
 .componentGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
