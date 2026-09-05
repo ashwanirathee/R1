@@ -28,7 +28,6 @@ export default function KicanvasSchematic(): ReactNode {
           src: schematicSrc,
           controls: 'full',
           controlslist: 'nodownload',
-          theme: 'kicad',
         })}
       </div>
     </div>
