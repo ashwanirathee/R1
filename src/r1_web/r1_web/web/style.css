@@ -17,6 +17,31 @@ button {
   border-radius: 12px;
 }
 
+.teleop-panel {
+  background: #f8fafc;
+}
+
+.teleop-help {
+  margin-top: 0;
+}
+
+.teleop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 12px;
+  max-width: 360px;
+  margin: 16px 0;
+}
+
+.teleop-grid button {
+  min-height: 56px;
+  font-weight: 700;
+}
+
+#teleop-status {
+  min-height: 24px;
+}
+
 .camera-list {
   margin-bottom: 16px;
 }

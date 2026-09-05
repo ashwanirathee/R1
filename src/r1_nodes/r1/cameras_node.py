@@ -1,6 +1,7 @@
 import cv2
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
@@ -18,6 +19,11 @@ class CamerasNode(Node):
         camera_labels = list(self.get_parameter("camera_labels").value)
         fps = self.get_parameter("fps").value
         self.jpeg_quality = int(self.get_parameter("jpeg_quality").value)
+        self.image_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+        )
 
         if len(camera_labels) < len(camera_uids):
             camera_labels.extend(str(uid) for uid in camera_uids[len(camera_labels) :])
@@ -41,8 +47,16 @@ class CamerasNode(Node):
             raw_topic_name = f"/camera/uid_{uid}/image_raw"
             compressed_topic_name = f"/camera/uid_{uid}/image_compressed"
 
-            raw_publisher = self.create_publisher(Image, raw_topic_name, 10)
-            compressed_publisher = self.create_publisher(CompressedImage, compressed_topic_name, 10)
+            raw_publisher = self.create_publisher(
+                Image,
+                raw_topic_name,
+                self.image_qos,
+            )
+            compressed_publisher = self.create_publisher(
+                CompressedImage,
+                compressed_topic_name,
+                self.image_qos,
+            )
             
             self.cameras.append(
                 {

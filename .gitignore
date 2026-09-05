@@ -66,3 +66,6 @@ fp-info-cache
 .history/
 
 hardware/r1-control/kicad/schematics/*
+flywheel
+
+*.pt
