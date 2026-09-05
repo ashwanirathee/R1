@@ -34,6 +34,10 @@ setup(
         'r1/launchers/vlm_node',
         'r1/launchers/detector_node',
         'r1/launchers/segmentor_node',
+        'r1/launchers/semantic_segmentation_node',
+        'r1/launchers/pose_node',
+        'r1/launchers/monocular_depth_node',
+        'r1/launchers/oriented_detection_node',
         'r1/launchers/sampler_node',
     ],
 )

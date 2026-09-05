@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from r1.tasks.task_6.oriented_detection_node import main
+
+if __name__ == '__main__':
+    main()

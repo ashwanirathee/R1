@@ -27,6 +27,43 @@ def generate_launch_description():
         "task_2_segmentation_output_mode"
     )
     segmentor_model = LaunchConfiguration("segmentor_model")
+    enable_semantic_segmentation = LaunchConfiguration(
+        "enable_semantic_segmentation"
+    )
+    semantic_segmentation_camera_uid = LaunchConfiguration(
+        "semantic_segmentation_camera_uid"
+    )
+    enable_task_3_semantic_segmentation_tracking = LaunchConfiguration(
+        "enable_task_3_semantic_segmentation_tracking"
+    )
+    task_3_semantic_segmentation_output_mode = LaunchConfiguration(
+        "task_3_semantic_segmentation_output_mode"
+    )
+    semantic_segmentation_model = LaunchConfiguration(
+        "semantic_segmentation_model"
+    )
+    enable_pose = LaunchConfiguration("enable_pose")
+    pose_camera_uid = LaunchConfiguration("pose_camera_uid")
+    enable_task_4_pose_tracking = LaunchConfiguration(
+        "enable_task_4_pose_tracking"
+    )
+    task_4_pose_output_mode = LaunchConfiguration("task_4_pose_output_mode")
+    pose_model = LaunchConfiguration("pose_model")
+    enable_monocular_depth = LaunchConfiguration("enable_monocular_depth")
+    monocular_depth_camera_uid = LaunchConfiguration(
+        "monocular_depth_camera_uid"
+    )
+    task_5_depth_output_mode = LaunchConfiguration("task_5_depth_output_mode")
+    depth_model = LaunchConfiguration("depth_model")
+    enable_oriented_detection = LaunchConfiguration("enable_oriented_detection")
+    oriented_detection_camera_uid = LaunchConfiguration(
+        "oriented_detection_camera_uid"
+    )
+    enable_task_6_obb_tracking = LaunchConfiguration(
+        "enable_task_6_obb_tracking"
+    )
+    task_6_obb_output_mode = LaunchConfiguration("task_6_obb_output_mode")
+    obb_model = LaunchConfiguration("obb_model")
     enable_sampler = LaunchConfiguration("enable_sampler")
     sampler_camera_uid = LaunchConfiguration("sampler_camera_uid")
     sampler_save_dir = LaunchConfiguration("sampler_save_dir")
@@ -161,6 +198,115 @@ def generate_launch_description():
                 "segmentor_model",
                 default_value="yolo11n-seg.pt",
                 description="YOLO segmentation model used by segmentor_node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_semantic_segmentation",
+                default_value="false",
+                description="Start semantic_segmentation_node for task_3.",
+            ),
+            DeclareLaunchArgument(
+                "semantic_segmentation_camera_uid",
+                default_value="10",
+                description=(
+                    "Camera uid whose image stream should be used by "
+                    "semantic_segmentation_node."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "enable_task_3_semantic_segmentation_tracking",
+                default_value="false",
+                description=(
+                    "Enable tracking in semantic_segmentation_node for task_3."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "task_3_semantic_segmentation_output_mode",
+                default_value="events",
+                description=(
+                    "Semantic segmentation output mode: events, overlay, or "
+                    "both."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "semantic_segmentation_model",
+                default_value="yolo26n-sem.pt",
+                description="YOLO semantic segmentation model used by task_3.",
+            ),
+            DeclareLaunchArgument(
+                "enable_pose",
+                default_value="false",
+                description="Start pose_node for task_4.",
+            ),
+            DeclareLaunchArgument(
+                "pose_camera_uid",
+                default_value="10",
+                description="Camera uid whose image stream should be used by pose_node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_task_4_pose_tracking",
+                default_value="false",
+                description="Enable tracking in pose_node for task_4.",
+            ),
+            DeclareLaunchArgument(
+                "task_4_pose_output_mode",
+                default_value="events",
+                description="Pose output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "pose_model",
+                default_value="yolo26n-pose.pt",
+                description="YOLO pose model used by task_4.",
+            ),
+            DeclareLaunchArgument(
+                "enable_monocular_depth",
+                default_value="false",
+                description="Start monocular_depth_node for task_5.",
+            ),
+            DeclareLaunchArgument(
+                "monocular_depth_camera_uid",
+                default_value="10",
+                description=(
+                    "Camera uid whose image stream should be used by "
+                    "monocular_depth_node."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "task_5_depth_output_mode",
+                default_value="events",
+                description="Depth output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "depth_model",
+                default_value="yolo26s-depth.pt",
+                description="YOLO monocular depth model used by task_5.",
+            ),
+            DeclareLaunchArgument(
+                "enable_oriented_detection",
+                default_value="false",
+                description="Start oriented_detection_node for task_6.",
+            ),
+            DeclareLaunchArgument(
+                "oriented_detection_camera_uid",
+                default_value="10",
+                description=(
+                    "Camera uid whose image stream should be used by "
+                    "oriented_detection_node."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "enable_task_6_obb_tracking",
+                default_value="false",
+                description="Enable tracking in oriented_detection_node for task_6.",
+            ),
+            DeclareLaunchArgument(
+                "task_6_obb_output_mode",
+                default_value="events",
+                description="OBB output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "obb_model",
+                default_value="yolo26n-obb.pt",
+                description="YOLO oriented bounding box model used by task_6.",
             ),
             DeclareLaunchArgument(
                 "enable_sampler",
@@ -386,6 +532,75 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(enable_segmentor),
+            ),
+            Node(
+                package="r1",
+                executable="semantic_segmentation_node",
+                name="semantic_segmentation_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": semantic_segmentation_camera_uid,
+                        "enable_task_3_semantic_segmentation_tracking": (
+                            enable_task_3_semantic_segmentation_tracking
+                        ),
+                        "task_3_semantic_segmentation_output_mode": (
+                            task_3_semantic_segmentation_output_mode
+                        ),
+                        "semantic_segmentation_model": (
+                            semantic_segmentation_model
+                        ),
+                    }
+                ],
+                condition=IfCondition(enable_semantic_segmentation),
+            ),
+            Node(
+                package="r1",
+                executable="pose_node",
+                name="pose_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": pose_camera_uid,
+                        "enable_task_4_pose_tracking": (
+                            enable_task_4_pose_tracking
+                        ),
+                        "task_4_pose_output_mode": task_4_pose_output_mode,
+                        "pose_model": pose_model,
+                    }
+                ],
+                condition=IfCondition(enable_pose),
+            ),
+            Node(
+                package="r1",
+                executable="monocular_depth_node",
+                name="monocular_depth_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": monocular_depth_camera_uid,
+                        "task_5_depth_output_mode": task_5_depth_output_mode,
+                        "depth_model": depth_model,
+                    }
+                ],
+                condition=IfCondition(enable_monocular_depth),
+            ),
+            Node(
+                package="r1",
+                executable="oriented_detection_node",
+                name="oriented_detection_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": oriented_detection_camera_uid,
+                        "enable_task_6_obb_tracking": (
+                            enable_task_6_obb_tracking
+                        ),
+                        "task_6_obb_output_mode": task_6_obb_output_mode,
+                        "obb_model": obb_model,
+                    }
+                ],
+                condition=IfCondition(enable_oriented_detection),
             ),
             Node(
                 package="r1",

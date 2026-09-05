@@ -37,7 +37,7 @@ To remove build artifacts:
 rm -rf build install log
 ```
 
-Launch the full bringup stack with the task 1 detector enabled:
+Launch the base bringup stack:
 
 ```bash
 ros2 launch r1 bringup.launch.py \
@@ -53,24 +53,91 @@ ros2 launch r1 bringup.launch.py \
   enable_vlm:=false \
   enable_2dobd:=false \
   enable_3dobd:=false \
-  enable_detector:=true \
+  enable_detector:=false \
   enable_segmentor:=false \
+  enable_semantic_segmentation:=false \
+  enable_pose:=false \
+  enable_monocular_depth:=false \
+  enable_oriented_detection:=false \
   enable_sampler:=false \
   enable_wheels:=false \
   enable_ptz:=false \
   enable_sensors:=false \
-  gpio_chip:=4 \
-  enable_task_1_tracking:=false \
-  task_1_output_mode:="both" \
+  gpio_chip:=4
+```
+
+Task-specific perception nodes:
+
+```bash
+# Task 1: object detection
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
+  enable_detector:=true \
+  detector_camera_uid:=10 \
+  task_1_output_mode:=both
+
+# Task 2: instance segmentation
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
   enable_segmentor:=true \
   segmentor_camera_uid:=10 \
   task_2_segmentation_output_mode:=both
+
+# Task 3: semantic segmentation
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
+  enable_semantic_segmentation:=true \
+  semantic_segmentation_camera_uid:=10 \
+  task_3_semantic_segmentation_output_mode:=both
+
+# Task 4: pose
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
+  enable_pose:=true \
+  pose_camera_uid:=10 \
+  task_4_pose_output_mode:=both
+
+# Task 5: monocular depth
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
+  enable_monocular_depth:=true \
+  monocular_depth_camera_uid:=10 \
+  task_5_depth_output_mode:=both
+
+# Task 6: oriented object detection
+ros2 launch r1 bringup.launch.py \
+  camera_uids:="[10]" \
+  camera_labels:='["main"]' \
+  enable_2dobd:=false \
+  enable_3dobd:=false \
+  enable_oriented_detection:=true \
+  oriented_detection_camera_uid:=10 \
+  task_6_obb_output_mode:=both
 ```
 
-To run segmentation instead of detection, set `enable_detector:=false`,
-`enable_segmentor:=true`, and choose `task_2_segmentation_output_mode:=events`,
-`overlay`, or `both`. Segmentation events publish on `/segmentor/events`; overlay
-images publish on `/segmentor/overlay_image/compressed`.
+Perception overlay topics:
+
+- Task 1: `/detector/overlay_image/compressed`
+- Task 2: `/segmentor/overlay_image/compressed`
+- Task 3: `/semantic_segmentation/overlay_image/compressed`
+- Task 4: `/pose/overlay_image/compressed`
+- Task 5: `/monocular_depth/overlay_image/compressed`
+- Task 6: `/oriented_detection/overlay_image/compressed`
 
 Run Foxglove bridge:
 
