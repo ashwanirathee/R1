@@ -33,6 +33,7 @@ setup(
         'r1/launchers/sensor_node',
         'r1/launchers/vlm_node',
         'r1/launchers/detector_node',
+        'r1/launchers/segmentor_node',
         'r1/launchers/sampler_node',
     ],
 )

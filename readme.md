@@ -54,14 +54,23 @@ ros2 launch r1 bringup.launch.py \
   enable_2dobd:=false \
   enable_3dobd:=false \
   enable_detector:=true \
+  enable_segmentor:=false \
   enable_sampler:=false \
-  enable_wheels:=true \
+  enable_wheels:=false \
   enable_ptz:=false \
-  enable_sensors:=true \
+  enable_sensors:=false \
   gpio_chip:=4 \
-  enable_task_1_tracking:=true \
-  task_1_output_mode:="both"
+  enable_task_1_tracking:=false \
+  task_1_output_mode:="both" \
+  enable_segmentor:=true \
+  segmentor_camera_uid:=10 \
+  task_2_segmentation_output_mode:=both
 ```
+
+To run segmentation instead of detection, set `enable_detector:=false`,
+`enable_segmentor:=true`, and choose `task_2_segmentation_output_mode:=events`,
+`overlay`, or `both`. Segmentation events publish on `/segmentor/events`; overlay
+images publish on `/segmentor/overlay_image/compressed`.
 
 Run Foxglove bridge:
 
