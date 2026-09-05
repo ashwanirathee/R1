@@ -1,0 +1,25 @@
+.schematic {
+  width: min(100%, 1180px);
+}
+
+.viewer {
+  height: min(78vh, 720px);
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+}
+
+.viewer kicanvas-embed {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media screen and (max-width: 996px) {
+  .viewer {
+    height: 70vh;
+    min-height: 420px;
+  }
+}

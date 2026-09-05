@@ -1,0 +1,73 @@
+---
+sidebar_position: 2
+title: Schematic
+draft: true
+---
+
+# Schematic Design
+
+I made a schematic design of the R1 system to understand how the various 
+components interact with each other. The schematic is a high-level overview
+and does not include all the details, but it should give you a good idea of
+how the system is structured for the hardware components.
+
+But then I forgot to save my schematic and battery died, so I lost the schematic.
+
+I was quite proud of that schematic, but it took me 4 hrs to make it. Now,
+I don't want to put the same kind of effort again, so I will try to make a
+new schematic using AI. 
+
+2 prompt output after mentioning that and GPT 5.5 Medium also had access to the 
+entire R1 repository and website which mentioned what's connected to what:
+```
+so the schematic will have:
+- pi
+- imx477
+- battery for the motors
+- 2 l298n
+- 4 motors dc
+- 2 motors servo
+```
+
+I got the error:
+```
+Error loading schematic '/Users/ashwanirathee/Documents/R1/schematic.kicad_sch'.
+Expecting '')'' in '/Users/ashwanirathee/Documents/R1/schematic.kicad_sch', line 257, offset 36
+```
+
+I gave this error to the LLM. It produced a reasonable schematic, but it was not perfect. I will try to fix the schematic using AI and then I will try to generate a new schematic using AI.
+
+Now, the prompt got way more specific and reasoning level was increased to extra high.
+```
+Fair,
+- For Pi, use the symbol Raspberry_Pi_4
+- For L298N, use the symbol L298N
+- For Motors DC, use the symbol Motor_DC
+- For Motors Servo, use the symbol Motor_Servo
+- For IMX camera, use the symbol Conn_01x02
+- For BN0085 IMU, use the symbol Conn_01x04
+Then:
+- use the information from src/r1_nodes/ to connect wiring between motors to l298n to raspberry pi 
+- use the information from src/r1_nodes/ to connect wiring between servos and raspberry pi
+- connect the battery to the l298n where the two l298n are daisy chained and share ground with pi
+```
+
+The version was using real schematic symbols with naming better than I was doing and more comments.
+Albeit before it could generate the wiring, I ran out of credit.
+
+I say now:
+```
+Continue now
+```
+Wires are named nicely but they are not connected. They need to be connected. Also, pin names are hiding pin numbers which makes it slightly hard to read. Fix that.
+Took like 5m 34s.
+
+So I prompt the system again with the following:
+```
+Let's update some more:
+- wires are named but aren't connected. They need to be connected.
+- Pin names are hiding pin numbers which makes it slightly hard to read. Fix that.
+```
+Took like 10m 9s
+
+Now I want to continue myself:
