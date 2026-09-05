@@ -18,6 +18,15 @@ def generate_launch_description():
     enable_ear = LaunchConfiguration("enable_ear")
     enable_detector = LaunchConfiguration("enable_detector")
     detector_camera_uid = LaunchConfiguration("detector_camera_uid")
+    enable_segmentor = LaunchConfiguration("enable_segmentor")
+    segmentor_camera_uid = LaunchConfiguration("segmentor_camera_uid")
+    enable_task_2_segmentation_tracking = LaunchConfiguration(
+        "enable_task_2_segmentation_tracking"
+    )
+    task_2_segmentation_output_mode = LaunchConfiguration(
+        "task_2_segmentation_output_mode"
+    )
+    segmentor_model = LaunchConfiguration("segmentor_model")
     enable_sampler = LaunchConfiguration("enable_sampler")
     sampler_camera_uid = LaunchConfiguration("sampler_camera_uid")
     sampler_save_dir = LaunchConfiguration("sampler_save_dir")
@@ -124,6 +133,34 @@ def generate_launch_description():
                 "task_1_output_mode",
                 default_value="events",
                 description="Detector output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "enable_segmentor",
+                default_value="false",
+                description="Start segmentor_node for object segmentation.",
+            ),
+            DeclareLaunchArgument(
+                "segmentor_camera_uid",
+                default_value="10",
+                description=(
+                    "Camera uid whose image stream should be used by "
+                    "segmentor_node."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "enable_task_2_segmentation_tracking",
+                default_value="false",
+                description="Enable object tracking in segmentor_node for task_2.",
+            ),
+            DeclareLaunchArgument(
+                "task_2_segmentation_output_mode",
+                default_value="events",
+                description="Segmentor output mode: events, overlay, or both.",
+            ),
+            DeclareLaunchArgument(
+                "segmentor_model",
+                default_value="yolo11n-seg.pt",
+                description="YOLO segmentation model used by segmentor_node.",
             ),
             DeclareLaunchArgument(
                 "enable_sampler",
@@ -317,7 +354,7 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(enable_vlm),
             ),
-             Node(
+            Node(
                 package="r1",
                 executable="detector_node",
                 name="detector_node",
@@ -330,6 +367,25 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(enable_detector),
+            ),
+            Node(
+                package="r1",
+                executable="segmentor_node",
+                name="segmentor_node",
+                output="screen",
+                parameters=[
+                    {
+                        "camera_uid": segmentor_camera_uid,
+                        "enable_task_2_segmentation_tracking": (
+                            enable_task_2_segmentation_tracking
+                        ),
+                        "task_2_segmentation_output_mode": (
+                            task_2_segmentation_output_mode
+                        ),
+                        "segmentor_model": segmentor_model,
+                    }
+                ],
+                condition=IfCondition(enable_segmentor),
             ),
             Node(
                 package="r1",
